@@ -32,20 +32,17 @@ class ResidentHomePage extends ConsumerWidget {
                     : 'Barrier-free mode is disabled. The app is showing fastest routes instead of accessibility-safe routes.',
               ),
               const SizedBox(height: 16),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
+              Row(
                 children: [
-                  SizedBox(
-                    width: 220,
+                  Expanded(
                     child: PulseMetricTile(
                       label: 'My active reports',
                       value: '$unresolvedReports',
                       icon: Icons.assignment_outlined,
                     ),
                   ),
-                  SizedBox(
-                    width: 220,
+                  const SizedBox(width: 12),
+                  Expanded(
                     child: PulseMetricTile(
                       label: 'Unread notifications',
                       value: '${controller.unreadNotificationCount}',
@@ -125,20 +122,17 @@ class EmergencyDashboardPage extends ConsumerWidget {
         PulseSectionCard(
           title: 'Emergency command snapshot',
           subtitle: 'Responders can accept, transfer, and resolve incidents from mobile.',
-          child: Wrap(
-            spacing: 12,
-            runSpacing: 12,
+          child: Row(
             children: [
-              SizedBox(
-                width: 220,
+              Expanded(
                 child: PulseMetricTile(
                   label: 'Critical incidents',
                   value: '$criticalCount',
                   icon: Icons.crisis_alert_outlined,
                 ),
               ),
-              SizedBox(
-                width: 220,
+              const SizedBox(width: 12),
+              Expanded(
                 child: PulseMetricTile(
                   label: 'Crews on site',
                   value: '$onSiteCount',
@@ -191,20 +185,17 @@ class GovernmentDashboardPage extends ConsumerWidget {
           title: 'Akimat operations',
           subtitle:
               'Track city issues, validate reports, and prioritize accessibility bottlenecks.',
-          child: Wrap(
-            spacing: 12,
-            runSpacing: 12,
+          child: Row(
             children: [
-              SizedBox(
-                width: 220,
+              Expanded(
                 child: PulseMetricTile(
                   label: 'Awaiting review',
                   value: '$reviewCount',
                   icon: Icons.fact_check_outlined,
                 ),
               ),
-              SizedBox(
-                width: 220,
+              const SizedBox(width: 12),
+              Expanded(
                 child: PulseMetricTile(
                   label: 'Accessibility hotspots',
                   value: '$accessibilityHotspots',
@@ -253,20 +244,17 @@ class AdminDashboardPage extends ConsumerWidget {
           title: 'Platform control',
           subtitle:
               'Admins manage organizations, roles, and content moderation from mobile.',
-          child: Wrap(
-            spacing: 12,
-            runSpacing: 12,
+          child: Row(
             children: [
-              SizedBox(
-                width: 220,
+              Expanded(
                 child: PulseMetricTile(
                   label: 'Managed users',
                   value: '${controller.managedUsers.length}',
                   icon: Icons.people_outline,
                 ),
               ),
-              SizedBox(
-                width: 220,
+              const SizedBox(width: 12),
+              Expanded(
                 child: PulseMetricTile(
                   label: 'Organizations',
                   value: '${controller.organizations.length}',
@@ -314,20 +302,43 @@ class _QuickAction extends StatelessWidget {
 
     return Container(
       width: 160,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(20),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            theme.colorScheme.primaryContainer.withValues(alpha: 0.6),
+            theme.colorScheme.surface,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.15)),
+        boxShadow: [
+          BoxShadow(
+            color: theme.colorScheme.shadow.withValues(alpha: 0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: theme.colorScheme.primary),
-          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: theme.colorScheme.primary, size: 28),
+          ),
+          const SizedBox(height: 16),
           Text(
             label,
             style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w800,
+              height: 1.2,
             ),
           ),
         ],

@@ -72,114 +72,125 @@ class _AuthPageState extends ConsumerState<AuthPage> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    'Alatau Pulse',
-                    style: theme.textTheme.displaySmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Barrier-Free Alatau is now connected to Supabase. Residents sign in with email and password, while the phone number is saved for later emergency contact.',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  const PulseSectionCard(
-                    title: 'Core mobile flows',
-                    subtitle:
-                        'The app now loads accounts, roles, reports, incidents, announcements, and notifications from the database.',
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              theme.colorScheme.primary.withValues(alpha: 0.15),
+              theme.colorScheme.surface,
+              theme.colorScheme.tertiary.withValues(alpha: 0.1),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
+                child: Card(
+                  elevation: 24,
+                  shadowColor: theme.colorScheme.primary.withValues(alpha: 0.1),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(40),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _FeatureBullet('Email-based sign in and registration'),
-                        SizedBox(height: 10),
-                        _FeatureBullet('Phone number stored on profile for emergency follow-up'),
-                        SizedBox(height: 10),
-                        _FeatureBullet('Role-based app shell with resident inheritance'),
-                        SizedBox(height: 10),
-                        _FeatureBullet('Live reports, incidents, alerts, and notifications'),
+                        Text(
+                          'Alatau Pulse',
+                          style: theme.textTheme.displaySmall?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -1,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Barrier-Free Alatau is now connected to Supabase. Residents sign in with email and password, while the phone number is saved for later emergency contact.',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            height: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+                        SegmentedButton<bool>(
+                          style: SegmentedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
+                          segments: const [
+                            ButtonSegment<bool>(
+                              value: false,
+                              icon: Icon(Icons.login),
+                              label: Text('Sign In', style: TextStyle(fontWeight: FontWeight.bold)),
+                            ),
+                            ButtonSegment<bool>(
+                              value: true,
+                              icon: Icon(Icons.person_add_alt_1),
+                              label: Text('Register', style: TextStyle(fontWeight: FontWeight.bold)),
+                            ),
+                          ],
+                          selected: {_isRegisterMode},
+                          onSelectionChanged: (value) {
+                            setState(() => _isRegisterMode = value.first);
+                            ref.read(appControllerProvider).dismissMessage();
+                          },
+                        ),
+                        const SizedBox(height: 32),
+                        if (controller.authError != null)
+                          _InfoBanner(
+                            color: const Color(0xFFFEE2E2),
+                            textColor: const Color(0xFFB91C1C),
+                            message: controller.authError!,
+                          ),
+                        if (controller.authMessage != null)
+                          _InfoBanner(
+                            color: const Color(0xFFDCFCE7),
+                            textColor: const Color(0xFF166534),
+                            message: controller.authMessage!,
+                          ),
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 300),
+                          child: _isRegisterMode
+                              ? _RegisterForm(
+                                  isBusy: controller.isBusy,
+                                  nameController: _nameController,
+                                  phoneController: _phoneController,
+                                  emailController: _registerEmailController,
+                                  passwordController: _registerPasswordController,
+                                  selectedDistrict: _selectedDistrict,
+                                  onDistrictChanged: (value) {
+                                    if (value != null) {
+                                      setState(() => _selectedDistrict = value);
+                                    }
+                                  },
+                                  onSubmit: () async {
+                                    await ref.read(appControllerProvider).registerWithEmail(
+                                          fullName: _nameController.text,
+                                          phone: _phoneController.text,
+                                          email: _registerEmailController.text,
+                                          password: _registerPasswordController.text,
+                                          district: _selectedDistrict,
+                                        );
+                                  },
+                                )
+                              : _SignInForm(
+                                  isBusy: controller.isBusy,
+                                  emailController: _signInEmailController,
+                                  passwordController: _signInPasswordController,
+                                  onSubmit: () async {
+                                    await ref.read(appControllerProvider).signInWithEmail(
+                                          email: _signInEmailController.text,
+                                          password: _signInPasswordController.text,
+                                        );
+                                  },
+                                ),
+                        ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 24),
-                  SegmentedButton<bool>(
-                    segments: const [
-                      ButtonSegment<bool>(
-                        value: false,
-                        icon: Icon(Icons.login),
-                        label: Text('Sign In'),
-                      ),
-                      ButtonSegment<bool>(
-                        value: true,
-                        icon: Icon(Icons.person_add_alt_1),
-                        label: Text('Register'),
-                      ),
-                    ],
-                    selected: {_isRegisterMode},
-                    onSelectionChanged: (value) {
-                      setState(() => _isRegisterMode = value.first);
-                      ref.read(appControllerProvider).dismissMessage();
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  if (controller.authError != null)
-                    _InfoBanner(
-                      color: const Color(0xFFFEE2E2),
-                      textColor: const Color(0xFFB91C1C),
-                      message: controller.authError!,
-                    ),
-                  if (controller.authMessage != null)
-                    _InfoBanner(
-                      color: const Color(0xFFDCFCE7),
-                      textColor: const Color(0xFF166534),
-                      message: controller.authMessage!,
-                    ),
-                  if (_isRegisterMode)
-                    _RegisterForm(
-                      isBusy: controller.isBusy,
-                      nameController: _nameController,
-                      phoneController: _phoneController,
-                      emailController: _registerEmailController,
-                      passwordController: _registerPasswordController,
-                      selectedDistrict: _selectedDistrict,
-                      onDistrictChanged: (value) {
-                        if (value != null) {
-                          setState(() => _selectedDistrict = value);
-                        }
-                      },
-                      onSubmit: () async {
-                        await ref.read(appControllerProvider).registerWithEmail(
-                              fullName: _nameController.text,
-                              phone: _phoneController.text,
-                              email: _registerEmailController.text,
-                              password: _registerPasswordController.text,
-                              district: _selectedDistrict,
-                            );
-                      },
-                    )
-                  else
-                    _SignInForm(
-                      isBusy: controller.isBusy,
-                      emailController: _signInEmailController,
-                      passwordController: _signInPasswordController,
-                      onSubmit: () async {
-                        await ref.read(appControllerProvider).signInWithEmail(
-                              email: _signInEmailController.text,
-                              password: _signInPasswordController.text,
-                            );
-                      },
-                    ),
-                ],
+                ),
               ),
             ),
           ),

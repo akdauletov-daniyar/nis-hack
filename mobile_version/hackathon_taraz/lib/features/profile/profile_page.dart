@@ -18,23 +18,87 @@ class ProfilePage extends ConsumerWidget {
     }
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
       children: [
-        PulseSectionCard(
-          title: user.name,
-          subtitle: '${user.email} • ${user.phone}',
+        Center(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
+                      blurRadius: 24,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: CircleAvatar(
+                  radius: 56,
+                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                  child: Text(
+                    user.name.substring(0, 1).toUpperCase(),
+                    style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.primary,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                user.name,
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '${user.email} • ${user.phone}',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 16),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
+                alignment: WrapAlignment.center,
                 children: user.roles
-                    .map((role) => Chip(label: Text(role.shortLabel)))
+                    .map((role) => Chip(
+                          label: Text(
+                            role.shortLabel,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: Theme.of(context).colorScheme.onSecondaryContainer,
+                            ),
+                          ),
+                          backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+                          side: BorderSide.none,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ))
                     .toList(),
               ),
-              const SizedBox(height: 12),
-              Text('Primary district: ${user.district}'),
+              const SizedBox(height: 32),
+            ],
+          ),
+        ),
+        PulseSectionCard(
+          title: 'Location Profile',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: CircleAvatar(
+                  backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  child: Icon(Icons.location_city_outlined, color: Theme.of(context).colorScheme.primary),
+                ),
+                title: const Text('Primary district'),
+                subtitle: Text(user.district, style: const TextStyle(fontWeight: FontWeight.w600)),
+              ),
             ],
           ),
         ),

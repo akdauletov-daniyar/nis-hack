@@ -16,42 +16,61 @@ class RoleSelectionPage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Choose Your Mode'),
+        title: const Text('Choose Your Mode', style: TextStyle(fontWeight: FontWeight.w800)),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         actions: [
           TextButton.icon(
             onPressed: () async {
               await ref.read(appControllerProvider).signOut();
             },
-            icon: const Icon(Icons.logout),
-            label: const Text('Sign out'),
+            icon: const Icon(Icons.logout, color: Colors.redAccent),
+            label: const Text('Sign out', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
           ),
+          const SizedBox(width: 8),
         ],
       ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(24),
-          children: [
-            Text(
-              'Welcome back, ${user?.name ?? 'Operator'}',
-              style: theme.textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.w800,
+      extendBodyBehindAppBar: true,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              theme.colorScheme.primary.withValues(alpha: 0.1),
+              theme.colorScheme.surface,
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.all(24),
+            children: [
+              Text(
+                'Welcome back,\n${user?.name ?? 'Operator'}',
+                style: theme.textTheme.headlineLarge?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  height: 1.2,
+                  color: theme.colorScheme.primary,
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'This account carries multiple roles. Choose the mode you want to enter now. You can switch roles later without logging out.',
-              style: theme.textTheme.bodyLarge?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+              const SizedBox(height: 16),
+              Text(
+                'This account carries multiple roles. Choose the mode you want to enter now. You can switch roles later without logging out.',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  height: 1.5,
+                ),
               ),
-            ),
-            const SizedBox(height: 24),
-            ...roles.map(
-              (role) => Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: _RoleCard(role: role),
+              const SizedBox(height: 32),
+              ...roles.map(
+                (role) => Padding(
+                  padding: const EdgeInsets.only(bottom: 20),
+                  child: _RoleCard(role: role),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -68,11 +87,17 @@ class _RoleCard extends ConsumerWidget {
     final theme = Theme.of(context);
 
     return Card(
+      elevation: 8,
+      shadowColor: theme.colorScheme.primary.withValues(alpha: 0.15),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(28),
+        side: BorderSide(color: theme.colorScheme.primary.withValues(alpha: 0.1), width: 1),
+      ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(28),
         onTap: () => ref.read(appControllerProvider).selectRole(role),
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

@@ -33,15 +33,19 @@ class _RoleShellState extends ConsumerState<RoleShell> {
     final activeTab = shellTabs[_index];
 
     return Scaffold(
+      extendBody: true,
       appBar: AppBar(
-        title: Text('${widget.role.shortLabel} • ${activeTab.label}'),
+        title: Text(
+          '${widget.role.shortLabel} • ${activeTab.label}',
+          style: const TextStyle(fontWeight: FontWeight.w800),
+        ),
         actions: [
           IconButton(
             onPressed: () => _showNotifications(context, ref),
             icon: Badge(
               label: Text('${controller.unreadNotificationCount}'),
               isLabelVisible: controller.unreadNotificationCount > 0,
-              child: const Icon(Icons.notifications_none),
+              child: const Icon(Icons.notifications_outlined),
             ),
           ),
           PopupMenuButton<UserRole>(
@@ -62,42 +66,87 @@ class _RoleShellState extends ConsumerState<RoleShell> {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Center(
-                child: Chip(label: Text(widget.role.shortLabel)),
+                child: Chip(
+                  label: Text(
+                    widget.role.shortLabel,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  backgroundColor: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.5),
+                  side: BorderSide.none,
+                ),
               ),
             ),
           ),
         ],
       ),
-      body: activeTab.page,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
+              Theme.of(context).colorScheme.surface,
+              Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.05),
+            ],
+            stops: const [0.0, 0.4, 1.0],
+          ),
+        ),
+        child: SafeArea(child: activeTab.page),
+      ),
       floatingActionButton: _showsSos(widget.role)
           ? FloatingActionButton.extended(
+              backgroundColor: Theme.of(context).colorScheme.errorContainer,
+              foregroundColor: Theme.of(context).colorScheme.onErrorContainer,
+              elevation: 4,
               onPressed: () async {
                 await ref.read(appControllerProvider).triggerSos();
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('SOS dispatched to emergency queue'),
+                      behavior: SnackBarBehavior.floating,
                     ),
                   );
                 }
               },
-              icon: const Icon(Icons.sos),
-              label: const Text('SOS'),
+              icon: const Icon(Icons.sos_rounded),
+              label: const Text('SOS', style: TextStyle(fontWeight: FontWeight.bold)),
             )
           : null,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (value) {
-          setState(() => _index = value);
-        },
-        destinations: shellTabs
-            .map(
-              (tab) => NavigationDestination(
-                icon: Icon(tab.icon),
-                label: tab.label,
-              ),
-            )
-            .toList(),
+      bottomNavigationBar: Container(
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(32),
+          boxShadow: [
+            BoxShadow(
+              color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.08),
+              blurRadius: 24,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(32),
+          child: NavigationBar(
+            selectedIndex: _index,
+            labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
+            height: 64,
+            onDestinationSelected: (value) {
+              setState(() => _index = value);
+            },
+            destinations: shellTabs
+                .map(
+                  (tab) => NavigationDestination(
+                    icon: Icon(tab.icon),
+                    selectedIcon: Icon(tab.icon, color: Theme.of(context).colorScheme.primary),
+                    label: tab.label,
+                  ),
+                )
+                .toList(),
+          ),
+        ),
       ),
     );
   }
