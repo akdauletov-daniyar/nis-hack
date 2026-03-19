@@ -69,7 +69,95 @@ class _AuthPageState extends ConsumerState<AuthPage> {
   @override
   Widget build(BuildContext context) {
     final controller = ref.watch(appControllerProvider);
-    final theme = Theme.of(context);
+    final viewportHeight =
+        MediaQuery.of(context).size.height -
+        MediaQuery.of(context).padding.vertical;
+    final authSectionMinHeight = viewportHeight > 44
+        ? viewportHeight - 44
+        : 0.0;
+
+    final authCard = PulseSectionCard(
+      title: _isRegisterMode ? 'Create account' : 'Sign in',
+      subtitle: _isRegisterMode
+          ? 'Residents can register with email, phone, and district details.'
+          : 'Use your existing email and password to continue.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SegmentedButton<bool>(
+            segments: const [
+              ButtonSegment<bool>(
+                value: false,
+                icon: Icon(Icons.login),
+                label: Text('Sign In'),
+              ),
+              ButtonSegment<bool>(
+                value: true,
+                icon: Icon(Icons.person_add_alt_1),
+                label: Text('Register'),
+              ),
+            ],
+            selected: {_isRegisterMode},
+            onSelectionChanged: (value) {
+              setState(() => _isRegisterMode = value.first);
+              ref.read(appControllerProvider).dismissMessage();
+            },
+          ),
+          const SizedBox(height: 20),
+          if (controller.authError != null)
+            _InfoBanner(
+              color: const Color(0xFFFDE8E8),
+              textColor: const Color(0xFFB42318),
+              message: controller.authError!,
+            ),
+          if (controller.authMessage != null)
+            _InfoBanner(
+              color: const Color(0xFFE7F6EC),
+              textColor: const Color(0xFF166534),
+              message: controller.authMessage!,
+            ),
+          if (_isRegisterMode)
+            _RegisterForm(
+              isBusy: controller.isBusy,
+              nameController: _nameController,
+              phoneController: _phoneController,
+              emailController: _registerEmailController,
+              passwordController: _registerPasswordController,
+              selectedDistrict: _selectedDistrict,
+              onDistrictChanged: (value) {
+                if (value != null) {
+                  setState(() => _selectedDistrict = value);
+                }
+              },
+              onSubmit: () async {
+                await ref
+                    .read(appControllerProvider)
+                    .registerWithEmail(
+                      fullName: _nameController.text,
+                      phone: _phoneController.text,
+                      email: _registerEmailController.text,
+                      password: _registerPasswordController.text,
+                      district: _selectedDistrict,
+                    );
+              },
+            )
+          else
+            _SignInForm(
+              isBusy: controller.isBusy,
+              emailController: _signInEmailController,
+              passwordController: _signInPasswordController,
+              onSubmit: () async {
+                await ref
+                    .read(appControllerProvider)
+                    .signInWithEmail(
+                      email: _signInEmailController.text,
+                      password: _signInPasswordController.text,
+                    );
+              },
+            ),
+        ],
+      ),
+    );
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -83,95 +171,18 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    PulseSectionCard(
-                      title: _isRegisterMode ? 'Create account' : 'Sign in',
-                      subtitle: _isRegisterMode
-                          ? 'Residents can register with email, phone, and district details.'
-                          : 'Use your existing email and password to continue.',
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          SegmentedButton<bool>(
-                            segments: const [
-                              ButtonSegment<bool>(
-                                value: false,
-                                icon: Icon(Icons.login),
-                                label: Text('Sign In'),
-                              ),
-                              ButtonSegment<bool>(
-                                value: true,
-                                icon: Icon(Icons.person_add_alt_1),
-                                label: Text('Register'),
-                              ),
-                            ],
-                            selected: {_isRegisterMode},
-                            onSelectionChanged: (value) {
-                              setState(() => _isRegisterMode = value.first);
-                              ref.read(appControllerProvider).dismissMessage();
-                            },
-                          ),
-                          const SizedBox(height: 20),
-                          if (controller.authError != null)
-                            _InfoBanner(
-                              color: const Color(0xFFFDE8E8),
-                              textColor: const Color(0xFFB42318),
-                              message: controller.authError!,
-                            ),
-                          if (controller.authMessage != null)
-                            _InfoBanner(
-                              color: const Color(0xFFE7F6EC),
-                              textColor: const Color(0xFF166534),
-                              message: controller.authMessage!,
-                            ),
-                          if (_isRegisterMode)
-                            _RegisterForm(
-                              isBusy: controller.isBusy,
-                              nameController: _nameController,
-                              phoneController: _phoneController,
-                              emailController: _registerEmailController,
-                              passwordController: _registerPasswordController,
-                              selectedDistrict: _selectedDistrict,
-                              onDistrictChanged: (value) {
-                                if (value != null) {
-                                  setState(() => _selectedDistrict = value);
-                                }
-                              },
-                              onSubmit: () async {
-                                await ref
-                                    .read(appControllerProvider)
-                                    .registerWithEmail(
-                                      fullName: _nameController.text,
-                                      phone: _phoneController.text,
-                                      email: _registerEmailController.text,
-                                      password:
-                                          _registerPasswordController.text,
-                                      district: _selectedDistrict,
-                                    );
-                              },
-                            )
-                          else
-                            _SignInForm(
-                              isBusy: controller.isBusy,
-                              emailController: _signInEmailController,
-                              passwordController: _signInPasswordController,
-                              onSubmit: () async {
-                                await ref
-                                    .read(appControllerProvider)
-                                    .signInWithEmail(
-                                      email: _signInEmailController.text,
-                                      password: _signInPasswordController.text,
-                                    );
-                              },
-                            ),
-                        ],
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: authSectionMinHeight,
                       ),
+                      child: Center(child: authCard),
                     ),
                     const SizedBox(height: 18),
-                    PulseSectionCard(
+                    const PulseSectionCard(
                       title: 'What is already connected',
                       subtitle:
                           'The data layer can stay as-is for now. This pass focuses on the UI and the mobile experience.',
-                      child: const PulseWrapGrid(
+                      child: PulseWrapGrid(
                         minItemWidth: 180,
                         children: [
                           PulseActionTile(
@@ -196,13 +207,6 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                       ),
                     ),
                     const SizedBox(height: 18),
-                    Text(
-                      'Palette source: `app_constants.dart`',
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
                   ],
                 ),
               ),

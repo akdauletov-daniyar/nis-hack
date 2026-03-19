@@ -351,6 +351,24 @@ List<_ShellTab> _tabsForRole(UserRole role) {
   };
 }
 
+Color _roleMenuAccent(UserRole role) {
+  return switch (role) {
+    UserRole.resident => Colors.blueAccent,
+    UserRole.emergencyService => Colors.deepOrange,
+    UserRole.government => Colors.deepPurple,
+    UserRole.admin => const Color(0xFF111827),
+  };
+}
+
+IconData _roleMenuIcon(UserRole role) {
+  return switch (role) {
+    UserRole.resident => Icons.home_work_outlined,
+    UserRole.emergencyService => Icons.health_and_safety_outlined,
+    UserRole.government => Icons.apartment_outlined,
+    UserRole.admin => Icons.admin_panel_settings_outlined,
+  };
+}
+
 class _ShellHeader extends StatelessWidget {
   const _ShellHeader({
     required this.unreadNotificationCount,
@@ -412,13 +430,16 @@ class _ShellHeader extends StatelessWidget {
                 PopupMenuButton<UserRole>(
                   tooltip: 'Switch role',
                   onSelected: onRoleSelected,
+                  position: PopupMenuPosition.under,
                   itemBuilder: (context) {
                     return availableRoles
                         .map(
                           (availableRole) => PopupMenuItem(
                             value: availableRole,
-                            child: Text(
-                              'Switch to ${availableRole.shortLabel}',
+                            child: PulseMenuOptionLabel(
+                              title: availableRole.shortLabel,
+                              icon: _roleMenuIcon(availableRole),
+                              accentColor: _roleMenuAccent(availableRole),
                             ),
                           ),
                         )
