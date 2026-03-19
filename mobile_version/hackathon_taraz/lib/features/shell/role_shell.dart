@@ -27,12 +27,46 @@ class _RoleShellState extends ConsumerState<RoleShell> {
   int _index = 0;
 
   @override
+  void didUpdateWidget(covariant RoleShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final tabCount = _tabsForRole(widget.role).length;
+    final nextIndex = oldWidget.role != widget.role
+        ? 0
+        : _index.clamp(0, tabCount - 1);
+
+    if (nextIndex != _index) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        setState(() => _index = nextIndex);
+      });
+    }
+  }
+
+  void _handleRoleSelected(UserRole role) {
+    if (role == widget.role) {
+      return;
+    }
+
+    if (_index != 0) {
+      setState(() => _index = 0);
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      ref.read(appControllerProvider).switchRole(role);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final controller = ref.watch(appControllerProvider);
     final shellTabs = _tabsForRole(widget.role);
     final theme = Theme.of(context);
-    final shouldLiftSos =
-        widget.role == UserRole.resident && _index == 0;
+    final shouldLiftSos = widget.role == UserRole.resident && _index == 0;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -49,10 +83,7 @@ class _RoleShellState extends ConsumerState<RoleShell> {
                   availableRoles: controller.availableRoles,
                   onNotificationsPressed: () =>
                       _showNotifications(context, ref),
-                  onRoleSelected: (role) {
-                    ref.read(appControllerProvider).switchRole(role);
-                    setState(() => _index = 0);
-                  },
+                  onRoleSelected: _handleRoleSelected,
                 ),
               ),
               Expanded(
@@ -140,10 +171,15 @@ class _ResidentMapSosFabLocation extends StandardFabLocation
     with FabEndOffsetX, FabFloatOffsetY {
   const _ResidentMapSosFabLocation();
 
+  static const _mapSearchBarLift = 67.0;
+
   @override
-  double getOffsetY(ScaffoldPrelayoutGeometry scaffoldGeometry, double adjustment) {
+  double getOffsetY(
+    ScaffoldPrelayoutGeometry scaffoldGeometry,
+    double adjustment,
+  ) {
     final baseOffset = super.getOffsetY(scaffoldGeometry, adjustment);
-    return baseOffset - 240;
+    return baseOffset - _mapSearchBarLift;
   }
 }
 
@@ -176,7 +212,9 @@ class _AnimatedSosFab extends StatelessWidget {
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0x330B1220).withValues(alpha: value * 0.25),
+                      color: const Color(
+                        0x330B1220,
+                      ).withValues(alpha: value * 0.25),
                       blurRadius: shadowBlur,
                       spreadRadius: shadowSpread,
                       offset: Offset(0, 10 - (value * 2)),
@@ -329,9 +367,7 @@ Future<ActionResult?> _showSosDialog(BuildContext context, WidgetRef ref) {
 }
 
 bool _showsSos(UserRole role) {
-  return role == UserRole.resident ||
-      role == UserRole.emergencyService ||
-      role == UserRole.government;
+  return role == UserRole.resident || role == UserRole.emergencyService;
 }
 
 List<_ShellTab> _tabsForRole(UserRole role) {

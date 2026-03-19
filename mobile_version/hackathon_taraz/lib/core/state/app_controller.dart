@@ -67,13 +67,7 @@ class AppController extends ChangeNotifier {
   }
 
   List<CityReport> get governmentFeed {
-    return reports
-        .where(
-          (report) =>
-              report.status != ReportStatus.closed &&
-              report.status != ReportStatus.spam,
-        )
-        .toList();
+    return reports.where((report) => report.status.isOperationallyOpen).toList();
   }
 
   List<CityReport> get moderationQueue {
@@ -123,9 +117,7 @@ class AppController extends ChangeNotifier {
         .where(
           (report) =>
               report.accessibilityRelated &&
-              report.status != ReportStatus.closed &&
-              report.status != ReportStatus.rejected &&
-              report.status != ReportStatus.spam,
+              report.status.isOperationallyOpen,
         )
         .map(
           (report) => MapObstacle(
@@ -146,9 +138,7 @@ class AppController extends ChangeNotifier {
         .where(
           (report) =>
               report.district == destination.district &&
-              report.status != ReportStatus.closed &&
-              report.status != ReportStatus.rejected &&
-              report.status != ReportStatus.spam,
+              report.status.isOperationallyOpen,
         )
         .toList();
     final relevantObstacles = relevantReports
@@ -685,6 +675,16 @@ class AppController extends ChangeNotifier {
       notificationTitle: 'Report assigned',
       notificationBody:
           'Your report has been assigned to a responsible organization.',
+    );
+  }
+
+  Future<ActionResult> resolveReport(String reportId) async {
+    return _updateReportStatus(
+      reportId,
+      ReportStatus.resolved,
+      notificationTitle: 'Report resolved',
+      notificationBody:
+          'Your report has been marked as solved by the city team.',
     );
   }
 

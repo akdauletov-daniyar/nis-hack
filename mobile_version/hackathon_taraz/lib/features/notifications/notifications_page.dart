@@ -29,6 +29,7 @@ class NotificationsPage extends ConsumerWidget {
                         icon: Icons.notifications_off_outlined,
                       )
                     : Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: controller.notifications.map((notification) {
                           final isUnread = !notification.read;
 

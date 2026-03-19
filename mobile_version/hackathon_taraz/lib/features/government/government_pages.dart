@@ -17,6 +17,14 @@ class _GovernmentFeedPageState extends ConsumerState<GovernmentFeedPage> {
   String _districtFilter = 'All districts';
   String _statusFilter = 'All statuses';
 
+  Future<void> _markSolved(CityReport report) async {
+    final result = await ref.read(appControllerProvider).resolveReport(report.id);
+    if (!mounted) {
+      return;
+    }
+    showActionResultSnackBar(context, result);
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = ref.watch(appControllerProvider);
@@ -71,7 +79,9 @@ class _GovernmentFeedPageState extends ConsumerState<GovernmentFeedPage> {
                     label: 'All statuses',
                     icon: Icons.filter_alt_outlined,
                   ),
-                  ...ReportStatus.values.map(
+                  ...ReportStatus.values
+                      .where((status) => status.isOperationallyOpen)
+                      .map(
                     (status) => PulseDropdownOption(
                       value: status.label,
                       label: status.label,
@@ -160,6 +170,14 @@ class _GovernmentFeedPageState extends ConsumerState<GovernmentFeedPage> {
                         const SizedBox(height: 16),
                         Row(
                           children: [
+                            FilledButton.tonalIcon(
+                              onPressed: controller.isBusy
+                                  ? null
+                                  : () => _markSolved(report),
+                              icon: const Icon(Icons.task_alt_outlined),
+                              label: const Text('Solved'),
+                            ),
+                            const SizedBox(width: 12),
                             Text(
                               'Open review details',
                               style: Theme.of(context).textTheme.labelLarge
@@ -592,6 +610,17 @@ class _GovernmentReportReviewSheetState
                     spacing: 12,
                     runSpacing: 12,
                     children: [
+                      FilledButton.tonalIcon(
+                        onPressed: controller.isBusy
+                            ? null
+                            : () => _runAction(
+                                  () => ref
+                                      .read(appControllerProvider)
+                                      .resolveReport(widget.report.id),
+                                ),
+                        icon: const Icon(Icons.task_alt_outlined),
+                        label: const Text('Mark solved'),
+                      ),
                       FilledButton.tonalIcon(
                         onPressed: controller.isBusy
                             ? null

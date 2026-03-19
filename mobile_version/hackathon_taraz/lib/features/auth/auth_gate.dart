@@ -31,7 +31,6 @@ class AuthGate extends ConsumerWidget {
     }
 
     return RoleShell(
-      key: ValueKey(controller.activeRole ?? controller.availableRoles.first),
       role: controller.activeRole ?? controller.availableRoles.first,
     );
   }

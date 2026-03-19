@@ -18,6 +18,7 @@ import 'live_route_service.dart';
 
 const _alatauCenter = LatLng(43.2389, 76.8897);
 const _searchHistoryPrefsKey = 'resident_map_search_history';
+const _mapCarouselHeight = 228.0;
 
 class CityMapPage extends ConsumerStatefulWidget {
   const CityMapPage({super.key, required this.role});
@@ -30,12 +31,16 @@ class CityMapPage extends ConsumerStatefulWidget {
 
 class _CityMapPageState extends ConsumerState<CityMapPage> {
   GoogleMapController? _mapController;
+  late final PageController _mapCardController;
   Timer? _routeMessageTimer;
+  LatLng _cameraTarget = _alatauCenter;
   LatLng? _currentLocation;
   LatLng? _selectedDestination;
   String? _selectedDestinationTitle;
   String? _selectedDestinationAddress;
   String? _selectedMapMarkerId;
+  int _selectedMapCardIndex = 0;
+  bool _isAnimatingMapCardPage = false;
   LiveRouteResult? _liveRoute;
   LiveTravelMode _travelMode = LiveTravelMode.walking;
   double _cameraZoom = 14.3;
@@ -45,21 +50,62 @@ class _CityMapPageState extends ConsumerState<CityMapPage> {
   String? _locationMessage;
   String? _routeMessage;
   List<SearchPlaceResult> _searchHistory = const [];
+  BitmapDescriptor? _interactiveMarkerIcon;
+  BitmapDescriptor? _interactiveMarkerSelectedIcon;
 
   bool get _showsResidentNavigation => widget.role == UserRole.resident;
+  bool get _showsGovernmentOperationsMap => widget.role == UserRole.government;
+  bool get _prioritizesIncidentCards => widget.role == UserRole.government;
+  BitmapDescriptor get _defaultInteractiveMarkerIcon =>
+      _interactiveMarkerIcon ??
+      BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed);
+  BitmapDescriptor get _selectedInteractiveMarkerIcon =>
+      _interactiveMarkerSelectedIcon ??
+      BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen);
 
   @override
   void initState() {
     super.initState();
+    _mapCardController = PageController(viewportFraction: 0.88);
+    unawaited(_loadInteractiveMarkerIcons());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadSearchHistory();
       _refreshCurrentLocation(centerMap: true);
     });
   }
 
+  Future<void> _loadInteractiveMarkerIcons() async {
+    try {
+      final defaultMarker = await BitmapDescriptor.asset(
+        const ImageConfiguration(),
+        'assets/map/interactive_marker.png',
+        width: 32,
+        height: 49,
+      );
+      final selectedMarker = await BitmapDescriptor.asset(
+        const ImageConfiguration(),
+        'assets/map/interactive_marker_selected.png',
+        width: 32,
+        height: 49,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _interactiveMarkerIcon = defaultMarker;
+        _interactiveMarkerSelectedIcon = selectedMarker;
+      });
+    } catch (_) {
+      // Keep marker fallbacks when assets are unavailable.
+    }
+  }
+
   @override
   void dispose() {
     _routeMessageTimer?.cancel();
+    _mapCardController.dispose();
     super.dispose();
   }
 
@@ -371,41 +417,266 @@ class _CityMapPageState extends ConsumerState<CityMapPage> {
     });
   }
 
-  Future<void> _focusMarker(LatLng point) async {
-    if (_mapController == null) {
+  bool _isNearPoint(LatLng first, LatLng second) {
+    return (first.latitude - second.latitude).abs() < 0.00028 &&
+        (first.longitude - second.longitude).abs() < 0.00028;
+  }
+
+  Future<void> _focusMarker(LatLng point, {bool animate = true}) async {
+    final controller = _mapController;
+    if (controller == null) {
       return;
     }
 
     final nextZoom = _cameraZoom < 15.2 ? 15.2 : _cameraZoom;
-    await _mapController!.animateCamera(
-      CameraUpdate.newCameraPosition(
-        CameraPosition(target: point, zoom: nextZoom),
-      ),
+    if (_isNearPoint(_cameraTarget, point) &&
+        (_cameraZoom - nextZoom).abs() < 0.12) {
+      return;
+    }
+
+    final update = CameraUpdate.newCameraPosition(
+      CameraPosition(target: point, zoom: nextZoom),
     );
+
+    if (animate) {
+      await controller.animateCamera(update);
+      return;
+    }
+
+    await controller.moveCamera(update);
   }
 
-  Future<void> _handleReportMarkerTap(CityReport report) async {
+  List<_MapCarouselItem> _buildMapCarouselItems(AppController controller) {
+    if (_showsResidentNavigation) {
+      return const [];
+    }
+
+    final reportItems = <_MapCarouselItem>[];
+    final incidentItems = <_MapCarouselItem>[];
+
+    for (final report in controller.reports) {
+      final latitude = report.latitude;
+      final longitude = report.longitude;
+      if (latitude == null || longitude == null) {
+        continue;
+      }
+      if (!report.status.isOperationallyOpen) {
+        continue;
+      }
+      if (report.accessibilityRelated && !controller.showBarrierLayer) {
+        continue;
+      }
+      if (!report.accessibilityRelated && !controller.showReportLayer) {
+        continue;
+      }
+
+      reportItems.add(_MapCarouselItem.fromReport(report));
+    }
+
+    if (controller.showIncidentLayer) {
+      for (final incident in controller.incidents) {
+        final latitude = incident.latitude;
+        final longitude = incident.longitude;
+        if (latitude == null || longitude == null) {
+          continue;
+        }
+
+        incidentItems.add(_MapCarouselItem.fromIncident(incident));
+      }
+    }
+
+    return _prioritizesIncidentCards
+        ? [...incidentItems, ...reportItems]
+        : [...reportItems, ...incidentItems];
+  }
+
+  int _currentMapCardPageIndex(List<_MapCarouselItem> items) {
+    if (items.isEmpty) {
+      return 0;
+    }
+
+    final currentPage = _mapCardController.hasClients
+        ? (_mapCardController.page ?? _selectedMapCardIndex.toDouble()).round()
+        : _selectedMapCardIndex;
+    return currentPage.clamp(0, items.length - 1);
+  }
+
+  int _mapCardIndexForMarkerId(List<_MapCarouselItem> items, String markerId) {
+    return items.indexWhere((item) => item.markerId == markerId);
+  }
+
+  void _syncMapCardSelection(List<_MapCarouselItem> items) {
+    final selectedMarkerId = _selectedMapMarkerId;
+    final keepsDestinationSelection =
+        selectedMarkerId == 'resident-destination';
+
+    var nextIndex = _selectedMapCardIndex;
+    var nextMarkerId = selectedMarkerId;
+
+    if (items.isEmpty) {
+      nextIndex = 0;
+      if (selectedMarkerId != null && !keepsDestinationSelection) {
+        nextMarkerId = null;
+      }
+    } else {
+      final fallbackIndex = _currentMapCardPageIndex(items);
+      final selectedIndex = selectedMarkerId == null
+          ? -1
+          : _mapCardIndexForMarkerId(items, selectedMarkerId);
+
+      if (selectedMarkerId == null) {
+        nextIndex = fallbackIndex;
+        nextMarkerId = items[nextIndex].markerId;
+      } else if (selectedIndex >= 0) {
+        nextIndex = selectedIndex;
+      } else if (keepsDestinationSelection) {
+        nextIndex = fallbackIndex;
+      } else {
+        nextIndex = fallbackIndex;
+        nextMarkerId = items[nextIndex].markerId;
+      }
+    }
+
+    final shouldJumpPage =
+        items.isNotEmpty &&
+        _mapCardController.hasClients &&
+        !_isAnimatingMapCardPage &&
+        _currentMapCardPageIndex(items) != nextIndex;
+    final shouldUpdateState =
+        nextIndex != _selectedMapCardIndex ||
+        nextMarkerId != _selectedMapMarkerId;
+
+    if (!shouldJumpPage && !shouldUpdateState) {
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+
+      if (shouldUpdateState) {
+        setState(() {
+          _selectedMapCardIndex = nextIndex;
+          _selectedMapMarkerId = nextMarkerId;
+        });
+      }
+
+      if (shouldJumpPage && _mapCardController.hasClients) {
+        _mapCardController.jumpToPage(nextIndex);
+      }
+    });
+  }
+
+  Future<void> _selectMapCardByIndex(
+    List<_MapCarouselItem> items,
+    int index, {
+    bool animatePage = false,
+    bool animateCamera = true,
+    bool animateCameraTransition = true,
+  }) async {
+    if (items.isEmpty || index < 0 || index >= items.length) {
+      return;
+    }
+
+    final currentIndex = _currentMapCardPageIndex(items);
+    final item = items[index];
+    final shouldAnimatePage =
+        animatePage && _mapCardController.hasClients && currentIndex != index;
+
+    if (shouldAnimatePage) {
+      _isAnimatingMapCardPage = true;
+    }
+
+    if (mounted) {
+      setState(() {
+        _selectedMapCardIndex = index;
+        _selectedMapMarkerId = item.markerId;
+      });
+    }
+
+    if (shouldAnimatePage) {
+      try {
+        await _mapCardController.animateToPage(
+          index,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.bounceInOut,
+        );
+      } finally {
+        _isAnimatingMapCardPage = false;
+      }
+    }
+
+    if (animateCamera) {
+      await _focusMarker(item.location, animate: animateCameraTransition);
+    }
+  }
+
+  void _openMapCardDetails(_MapCarouselItem item) {
+    if (item.report != null) {
+      _showReportSheet(context, item.report!);
+      return;
+    }
+
+    if (item.incident != null) {
+      _showIncidentSheet(context, item.incident!, widget.role);
+    }
+  }
+
+  Future<void> _handleReportMarkerTap(
+    CityReport report,
+    List<_MapCarouselItem> items,
+  ) async {
     final latitude = report.latitude;
     final longitude = report.longitude;
     if (latitude == null || longitude == null) {
       return;
     }
 
-    setState(() => _selectedMapMarkerId = 'report-${report.id}');
+    final markerId = 'report-${report.id}';
+    final cardIndex = _mapCardIndexForMarkerId(items, markerId);
+    if (cardIndex >= 0) {
+      final currentIndex = _currentMapCardPageIndex(items);
+      await _selectMapCardByIndex(
+        items,
+        cardIndex,
+        animatePage: currentIndex != cardIndex,
+        animateCamera: true,
+      );
+      return;
+    }
+
+    setState(() => _selectedMapMarkerId = markerId);
     await _focusMarker(LatLng(latitude, longitude));
     if (mounted) {
       _showReportSheet(context, report);
     }
   }
 
-  Future<void> _handleIncidentMarkerTap(Incident incident) async {
+  Future<void> _handleIncidentMarkerTap(
+    Incident incident,
+    List<_MapCarouselItem> items,
+  ) async {
     final latitude = incident.latitude;
     final longitude = incident.longitude;
     if (latitude == null || longitude == null) {
       return;
     }
 
-    setState(() => _selectedMapMarkerId = 'incident-${incident.id}');
+    final markerId = 'incident-${incident.id}';
+    final cardIndex = _mapCardIndexForMarkerId(items, markerId);
+    if (cardIndex >= 0) {
+      final currentIndex = _currentMapCardPageIndex(items);
+      await _selectMapCardByIndex(
+        items,
+        cardIndex,
+        animatePage: currentIndex != cardIndex,
+        animateCamera: true,
+      );
+      return;
+    }
+
+    setState(() => _selectedMapMarkerId = markerId);
     await _focusMarker(LatLng(latitude, longitude));
     if (mounted) {
       _showIncidentSheet(context, incident, widget.role);
@@ -539,9 +810,9 @@ class _CityMapPageState extends ConsumerState<CityMapPage> {
                   const SizedBox(height: 18),
                   const _HintBox(
                     icon: Icons.touch_app_outlined,
-                    title: 'Tap markers for details',
+                    title: 'Tap markers or swipe cards',
                     message:
-                        'Reports and incidents still open their detail sheets from the map. Long press the map to set a resident destination.',
+                        'Marker taps and the bottom cards stay in sync. Swipe cards to move the camera, then tap the focused card to open full details.',
                   ),
                 ],
               ),
@@ -956,12 +1227,14 @@ class _CityMapPageState extends ConsumerState<CityMapPage> {
   Widget _buildResidentMapScreen(
     ThemeData theme,
     AppController controller,
-    RoutePlan routePlan,
+    List<_MapCarouselItem> mapItems,
   ) {
     final route = _liveRoute;
     final safeBottom = MediaQuery.of(context).padding.bottom;
     final footerOffset = safeBottom + 12;
-    final zoomControlsBottom = footerOffset + 144;
+    final hasMapCards = mapItems.isNotEmpty;
+    final mapCardsHeight = hasMapCards ? _mapCarouselHeight : 0.0;
+    final zoomControlsBottom = footerOffset + 144 + mapCardsHeight;
 
     return Stack(
       children: [
@@ -976,6 +1249,7 @@ class _CityMapPageState extends ConsumerState<CityMapPage> {
             },
             onCameraMove: (position) {
               _cameraZoom = position.zoom;
+              _cameraTarget = position.target;
             },
             myLocationEnabled: _locationPermissionGranted,
             myLocationButtonEnabled: false,
@@ -985,25 +1259,26 @@ class _CityMapPageState extends ConsumerState<CityMapPage> {
             compassEnabled: false,
             onLongPress: _setDestination,
             markers: _buildMarkers(
-              reports: controller.reports,
-              incidents: controller.incidents,
+              reports: const [],
+              incidents: const [],
               selectedMarkerId: _selectedMapMarkerId,
-              showReports: controller.showReportLayer,
-              showIncidents: controller.showIncidentLayer,
-              showBarriers: controller.showBarrierLayer,
+              defaultMarkerIcon: _defaultInteractiveMarkerIcon,
+              selectedMarkerIcon: _selectedInteractiveMarkerIcon,
+              showReports: false,
+              showIncidents: false,
+              showBarriers: false,
               destination: _selectedDestination,
               destinationTitle: _selectedDestinationTitle,
               showDestination: true,
               onDestinationTap: () {
                 setState(() => _selectedMapMarkerId = 'resident-destination');
               },
-              onReportTap: _handleReportMarkerTap,
-              onIncidentTap: _handleIncidentMarkerTap,
+              onReportTap: (report) => _handleReportMarkerTap(report, mapItems),
+              onIncidentTap: (incident) =>
+                  _handleIncidentMarkerTap(incident, mapItems),
             ),
             polylines: _buildPolylines(),
-            circles: controller.showIncidentLayer
-                ? _buildCircles(controller.incidents)
-                : const <Circle>{},
+            circles: const <Circle>{},
             gestureRecognizers: {
               Factory<OneSequenceGestureRecognizer>(EagerGestureRecognizer.new),
             },
@@ -1014,12 +1289,6 @@ class _CityMapPageState extends ConsumerState<CityMapPage> {
           right: 16,
           child: Column(
             children: [
-              _ResidentMapButton(
-                icon: Icons.layers_outlined,
-                tooltip: 'Map layers',
-                onTap: _showLayersSheet,
-              ),
-              const SizedBox(height: 12),
               _ResidentMapButton(
                 icon: Icons.accessible_forward_outlined,
                 tooltip: 'Barrier-free tools',
@@ -1154,7 +1423,9 @@ class _CityMapPageState extends ConsumerState<CityMapPage> {
                           ),
                         ),
                       )
-                    : const SizedBox.shrink(key: ValueKey('route-overlay-empty')),
+                    : const SizedBox.shrink(
+                        key: ValueKey('route-overlay-empty'),
+                      ),
               ),
               _ResidentSearchBar(
                 label: _selectedDestination == null
@@ -1162,6 +1433,98 @@ class _CityMapPageState extends ConsumerState<CityMapPage> {
                     : _selectedDestinationTitle ?? 'Search destination',
                 onTap: _showPlaceSearchSheet,
               ),
+              if (hasMapCards) ...[
+                const SizedBox(height: 14),
+                _buildMapCarousel(mapItems),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGovernmentMapScreen(
+    ThemeData _,
+    AppController controller,
+    List<_MapCarouselItem> mapItems,
+  ) {
+    final safeBottom = MediaQuery.of(context).padding.bottom;
+    final footerOffset = safeBottom + 12;
+    final hasMapCards = mapItems.isNotEmpty;
+    final mapCardsHeight = hasMapCards ? _mapCarouselHeight : 0.0;
+    final zoomControlsBottom = footerOffset + mapCardsHeight + 18;
+
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: GoogleMap(
+            initialCameraPosition: const CameraPosition(
+              target: _alatauCenter,
+              zoom: 14.3,
+            ),
+            onMapCreated: (controller) {
+              _mapController = controller;
+            },
+            onCameraMove: (position) {
+              _cameraZoom = position.zoom;
+              _cameraTarget = position.target;
+            },
+            myLocationEnabled: _locationPermissionGranted,
+            myLocationButtonEnabled: false,
+            mapToolbarEnabled: false,
+            zoomControlsEnabled: false,
+            compassEnabled: false,
+            markers: _buildMarkers(
+              reports: controller.reports,
+              incidents: controller.incidents,
+              selectedMarkerId: _selectedMapMarkerId,
+              defaultMarkerIcon: _defaultInteractiveMarkerIcon,
+              selectedMarkerIcon: _selectedInteractiveMarkerIcon,
+              showReports: controller.showReportLayer,
+              showIncidents: controller.showIncidentLayer,
+              showBarriers: controller.showBarrierLayer,
+              destination: _selectedDestination,
+              destinationTitle: _selectedDestinationTitle,
+              showDestination: false,
+              onDestinationTap: () {},
+              onReportTap: (report) => _handleReportMarkerTap(report, mapItems),
+              onIncidentTap: (incident) =>
+                  _handleIncidentMarkerTap(incident, mapItems),
+            ),
+            circles: controller.showIncidentLayer
+                ? _buildCircles(controller.incidents)
+                : const <Circle>{},
+            gestureRecognizers: {
+              Factory<OneSequenceGestureRecognizer>(EagerGestureRecognizer.new),
+            },
+          ),
+        ),
+        Positioned(
+          top: 16,
+          right: 16,
+          child: _ResidentMapButton(
+            icon: Icons.layers_outlined,
+            tooltip: 'Map layers',
+            onTap: _showLayersSheet,
+          ),
+        ),
+        Positioned(
+          right: 16,
+          bottom: zoomControlsBottom,
+          child: _ResidentZoomControls(
+            onZoomIn: () => _zoomBy(1),
+            onZoomOut: () => _zoomBy(-1),
+          ),
+        ),
+        Positioned(
+          left: 16,
+          right: 16,
+          bottom: footerOffset,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (hasMapCards) _buildMapCarousel(mapItems),
             ],
           ),
         ),
@@ -1174,9 +1537,16 @@ class _CityMapPageState extends ConsumerState<CityMapPage> {
     final controller = ref.watch(appControllerProvider);
     final routePlan = controller.activeRoutePlan;
     final theme = Theme.of(context);
+    final mapItems = _buildMapCarouselItems(controller);
+
+    _syncMapCardSelection(mapItems);
 
     if (_showsResidentNavigation) {
-      return _buildResidentMapScreen(theme, controller, routePlan);
+      return _buildResidentMapScreen(theme, controller, mapItems);
+    }
+
+    if (_showsGovernmentOperationsMap) {
+      return _buildGovernmentMapScreen(theme, controller, mapItems);
     }
 
     return PulsePageScroll(
@@ -1242,6 +1612,8 @@ class _CityMapPageState extends ConsumerState<CityMapPage> {
                       reports: controller.reports,
                       incidents: controller.incidents,
                       selectedMarkerId: _selectedMapMarkerId,
+                      defaultMarkerIcon: _defaultInteractiveMarkerIcon,
+                      selectedMarkerIcon: _selectedInteractiveMarkerIcon,
                       showReports: controller.showReportLayer,
                       showIncidents: controller.showIncidentLayer,
                       showBarriers: controller.showBarrierLayer,
@@ -1253,8 +1625,10 @@ class _CityMapPageState extends ConsumerState<CityMapPage> {
                           () => _selectedMapMarkerId = 'resident-destination',
                         );
                       },
-                      onReportTap: _handleReportMarkerTap,
-                      onIncidentTap: _handleIncidentMarkerTap,
+                      onReportTap: (report) =>
+                          _handleReportMarkerTap(report, mapItems),
+                      onIncidentTap: (incident) =>
+                          _handleIncidentMarkerTap(incident, mapItems),
                     ),
                     polylines: _buildPolylines(),
                     circles: controller.showIncidentLayer
@@ -1268,6 +1642,10 @@ class _CityMapPageState extends ConsumerState<CityMapPage> {
                   ),
                 ),
               ),
+              if (mapItems.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                _buildMapCarousel(mapItems),
+              ],
               if (!_showsResidentNavigation) ...[
                 const SizedBox(height: 16),
                 PulseWrapGrid(
@@ -1572,12 +1950,145 @@ class _CityMapPageState extends ConsumerState<CityMapPage> {
       ],
     );
   }
+
+  Widget _buildMapCarousel(List<_MapCarouselItem> items) {
+    return SizedBox(
+      height: _mapCarouselHeight,
+      child: PageView.builder(
+        controller: _mapCardController,
+        itemCount: items.length,
+        onPageChanged: (index) {
+          unawaited(
+            _selectMapCardByIndex(
+              items,
+              index,
+              animateCamera: !_isAnimatingMapCardPage,
+              animateCameraTransition: true,
+            ),
+          );
+        },
+        itemBuilder: (context, index) {
+          return AnimatedBuilder(
+            animation: _mapCardController,
+            builder: (context, child) {
+              final page = _mapCardController.hasClients
+                  ? (_mapCardController.page ??
+                        _selectedMapCardIndex.toDouble())
+                  : _selectedMapCardIndex.toDouble();
+              final distance = (page - index).abs().clamp(0.0, 1.0);
+              final scale = 1 - (distance * 0.06);
+              final verticalInset = 8 + (distance * 10);
+
+              return Padding(
+                padding: EdgeInsets.fromLTRB(8, verticalInset, 8, 4),
+                child: Transform.scale(
+                  alignment: Alignment.bottomCenter,
+                  scale: scale,
+                  child: _MapCarouselCard(
+                    item: items[index],
+                    isSelected: index == _selectedMapCardIndex,
+                    onTap: () async {
+                      final currentIndex = _currentMapCardPageIndex(items);
+                      if (currentIndex != index) {
+                        await _selectMapCardByIndex(
+                          items,
+                          index,
+                          animatePage: true,
+                          animateCamera: true,
+                        );
+                        return;
+                      }
+                      _openMapCardDetails(items[index]);
+                    },
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _MapCarouselItem {
+  const _MapCarouselItem({
+    required this.markerId,
+    required this.location,
+    required this.title,
+    required this.description,
+    required this.placeLabel,
+    required this.categoryLabel,
+    required this.statusLabel,
+    required this.urgencyLabel,
+    required this.metaLabel,
+    required this.icon,
+    required this.accentColor,
+    this.report,
+    this.incident,
+  }) : assert((report == null) != (incident == null));
+
+  factory _MapCarouselItem.fromReport(CityReport report) {
+    return _MapCarouselItem(
+      markerId: 'report-${report.id}',
+      location: LatLng(report.latitude!, report.longitude!),
+      title: report.title,
+      description: report.description,
+      placeLabel: report.location,
+      categoryLabel: report.accessibilityRelated
+          ? 'Barrier alert'
+          : 'Resident report',
+      statusLabel: report.status.label,
+      urgencyLabel: report.urgency.label,
+      metaLabel: report.createdAtLabel,
+      icon: iconForReportCategory(report.category),
+      accentColor: report.accessibilityRelated
+          ? AppConstants.mainAccentColor
+          : AppConstants.secondaryAccentColor,
+      report: report,
+    );
+  }
+
+  factory _MapCarouselItem.fromIncident(Incident incident) {
+    return _MapCarouselItem(
+      markerId: 'incident-${incident.id}',
+      location: LatLng(incident.latitude!, incident.longitude!),
+      title: incident.title,
+      description: 'Reporter: ${incident.reporterName} • ${incident.district}',
+      placeLabel: incident.district,
+      categoryLabel: 'Live incident',
+      statusLabel: incident.status.label,
+      urgencyLabel: incident.urgency.label,
+      metaLabel: incident.createdAtLabel,
+      icon: Icons.emergency_outlined,
+      accentColor: incident.urgency == UrgencyLevel.critical
+          ? AppConstants.accent2Color
+          : AppConstants.secondaryAccentColor,
+      incident: incident,
+    );
+  }
+
+  final String markerId;
+  final LatLng location;
+  final String title;
+  final String description;
+  final String placeLabel;
+  final String categoryLabel;
+  final String statusLabel;
+  final String urgencyLabel;
+  final String metaLabel;
+  final IconData icon;
+  final Color accentColor;
+  final CityReport? report;
+  final Incident? incident;
 }
 
 Set<Marker> _buildMarkers({
   required List<CityReport> reports,
   required List<Incident> incidents,
   required String? selectedMarkerId,
+  required BitmapDescriptor defaultMarkerIcon,
+  required BitmapDescriptor selectedMarkerIcon,
   required bool showReports,
   required bool showIncidents,
   required bool showBarriers,
@@ -1595,7 +2106,9 @@ Set<Marker> _buildMarkers({
       Marker(
         markerId: const MarkerId('resident-destination'),
         position: destination,
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+        icon: selectedMarkerId == 'resident-destination'
+            ? selectedMarkerIcon
+            : defaultMarkerIcon,
         infoWindow: InfoWindow(title: destinationTitle ?? 'Pinned destination'),
         onTap: onDestinationTap,
       ),
@@ -1606,6 +2119,9 @@ Set<Marker> _buildMarkers({
     final latitude = report.latitude;
     final longitude = report.longitude;
     if (latitude == null || longitude == null) {
+      continue;
+    }
+    if (!report.status.isOperationallyOpen) {
       continue;
     }
     if (report.accessibilityRelated && !showBarriers) {
@@ -1619,11 +2135,9 @@ Set<Marker> _buildMarkers({
       Marker(
         markerId: MarkerId('report-${report.id}'),
         position: LatLng(latitude, longitude),
-        icon: BitmapDescriptor.defaultMarkerWithHue(
-          selectedMarkerId == 'report-${report.id}'
-              ? BitmapDescriptor.hueGreen
-              : BitmapDescriptor.hueRed,
-        ),
+        icon: selectedMarkerId == 'report-${report.id}'
+            ? selectedMarkerIcon
+            : defaultMarkerIcon,
         onTap: () => onReportTap(report),
       ),
     );
@@ -1641,11 +2155,9 @@ Set<Marker> _buildMarkers({
         Marker(
           markerId: MarkerId('incident-${incident.id}'),
           position: LatLng(latitude, longitude),
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            selectedMarkerId == 'incident-${incident.id}'
-                ? BitmapDescriptor.hueGreen
-                : BitmapDescriptor.hueRed,
-          ),
+          icon: selectedMarkerId == 'incident-${incident.id}'
+              ? selectedMarkerIcon
+              : defaultMarkerIcon,
           onTap: () => onIncidentTap(incident),
         ),
       );
@@ -1792,6 +2304,320 @@ void _showIncidentSheet(
   );
 }
 
+class _MapCarouselCard extends StatelessWidget {
+  const _MapCarouselCard({
+    required this.item,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final _MapCarouselItem item;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final statusTone = item.report != null
+        ? _reportStatusTone(item.report!.status)
+        : _incidentStatusTone(item.incident!.status);
+    final urgencyTone = item.report != null
+        ? _urgencyTone(item.report!.urgency)
+        : _urgencyTone(item.incident!.urgency);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(30),
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(30),
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF171A1F), Color(0xFF101317)],
+            ),
+            border: Border.all(
+              color: isSelected
+                  ? item.accentColor.withValues(alpha: 0.82)
+                  : Colors.white.withValues(alpha: 0.08),
+              width: isSelected ? 1.6 : 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.18),
+                blurRadius: 24,
+                offset: const Offset(0, 14),
+              ),
+              BoxShadow(
+                color: item.accentColor.withValues(
+                  alpha: isSelected ? 0.18 : 0.08,
+                ),
+                blurRadius: isSelected ? 34 : 22,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Stack(
+            children: [
+              Positioned(
+                top: -38,
+                right: -12,
+                child: IgnorePointer(
+                  child: Container(
+                    height: 120,
+                    width: 120,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          item.accentColor.withValues(
+                            alpha: isSelected ? 0.28 : 0.20,
+                          ),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 0,
+                top: 18,
+                bottom: 18,
+                child: Container(
+                  width: 4,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(999),
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        item.accentColor.withValues(alpha: 0.95),
+                        item.accentColor.withValues(alpha: 0.24),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 18, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          height: 46,
+                          width: 46,
+                          decoration: BoxDecoration(
+                            color: item.accentColor.withValues(alpha: 0.14),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: item.accentColor.withValues(alpha: 0.24),
+                            ),
+                          ),
+                          child: Icon(
+                            item.icon,
+                            color: item.accentColor,
+                            size: 23,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  _MapCarouselPill(
+                                    text: item.categoryLabel.toUpperCase(),
+                                    color: item.accentColor,
+                                  ),
+                                  _MapCarouselPill(
+                                    text: item.metaLabel,
+                                    color: Colors.white,
+                                    icon: Icons.schedule_rounded,
+                                    backgroundAlpha: 0.08,
+                                    borderAlpha: 0.08,
+                                    textColor: Colors.white70,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                item.title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.headlineSmall?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w800,
+                                  height: 1.05,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Icon(
+                            Icons.arrow_outward_rounded,
+                            size: 20,
+                            color: Colors.white.withValues(
+                              alpha: isSelected ? 0.88 : 0.66,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.08),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.place_outlined,
+                            size: 17,
+                            color: item.accentColor.withValues(alpha: 0.95),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              item.placeLabel,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: Colors.white.withValues(alpha: 0.86),
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      item.description,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: Colors.white70,
+                        height: 1.35,
+                      ),
+                    ),
+                    const Spacer(),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              _MapCarouselPill(
+                                text: item.statusLabel,
+                                color: statusTone,
+                                icon: Icons.flag_outlined,
+                              ),
+                              _MapCarouselPill(
+                                text: item.urgencyLabel,
+                                color: urgencyTone,
+                                icon: Icons.priority_high_rounded,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Details',
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.78),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MapCarouselPill extends StatelessWidget {
+  const _MapCarouselPill({
+    required this.text,
+    required this.color,
+    this.icon,
+    this.backgroundAlpha = 0.16,
+    this.borderAlpha = 0,
+    this.textColor = Colors.white,
+  });
+
+  final String text;
+  final Color color;
+  final IconData? icon;
+  final double backgroundAlpha;
+  final double borderAlpha;
+  final Color textColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: backgroundAlpha),
+        borderRadius: BorderRadius.circular(999),
+        border: borderAlpha > 0
+            ? Border.all(color: color.withValues(alpha: borderAlpha))
+            : null,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 14, color: textColor),
+              const SizedBox(width: 6),
+            ],
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 144),
+              child: Text(
+                text,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: textColor,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _InlineNotice extends StatelessWidget {
   const _InlineNotice({
     required this.message,
@@ -1830,6 +2656,43 @@ class _InlineNotice extends StatelessWidget {
       ),
     );
   }
+}
+
+Color _urgencyTone(UrgencyLevel urgency) {
+  return switch (urgency) {
+    UrgencyLevel.low => const Color(0xFF41C66C),
+    UrgencyLevel.medium => const Color(0xFFFFB547),
+    UrgencyLevel.high => AppConstants.accent2Color,
+    UrgencyLevel.critical => const Color(0xFFFF5A5F),
+  };
+}
+
+Color _reportStatusTone(ReportStatus status) {
+  return switch (status) {
+    ReportStatus.submitted => AppConstants.secondaryAccentColor,
+    ReportStatus.underReview => AppConstants.accent2Color,
+    ReportStatus.validated => AppConstants.mainAccentColor,
+    ReportStatus.assigned => AppConstants.mainAccentColor,
+    ReportStatus.inProgress => const Color(0xFFFFB547),
+    ReportStatus.resolved => const Color(0xFF41C66C),
+    ReportStatus.closed => const Color(0xFF7D7D7D),
+    ReportStatus.rejected => const Color(0xFFFF5A5F),
+    ReportStatus.duplicate => const Color(0xFFB682FF),
+    ReportStatus.spam => const Color(0xFFFF5A5F),
+    ReportStatus.draft => const Color(0xFF7D7D7D),
+  };
+}
+
+Color _incidentStatusTone(IncidentStatus status) {
+  return switch (status) {
+    IncidentStatus.newIncident => AppConstants.accent2Color,
+    IncidentStatus.assigned => AppConstants.mainAccentColor,
+    IncidentStatus.crewEnRoute => AppConstants.secondaryAccentColor,
+    IncidentStatus.onSite => const Color(0xFFFFB547),
+    IncidentStatus.resolved => const Color(0xFF41C66C),
+    IncidentStatus.transferred => const Color(0xFFB682FF),
+    IncidentStatus.closed => const Color(0xFF7D7D7D),
+  };
 }
 
 class _HintBox extends StatelessWidget {
@@ -2256,18 +3119,20 @@ class _ResidentSearchInput extends StatelessWidget {
       focusNode: focusNode,
       autofocus: true,
       textInputAction: TextInputAction.search,
-      style: Theme.of(
-        context,
-      ).textTheme.titleLarge?.copyWith(color: Colors.white, fontWeight: FontWeight.w600),
+      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+        color: Colors.white,
+        fontWeight: FontWeight.w600,
+      ),
       cursorColor: const Color(0xFF31D158),
       onSubmitted: (_) => onSubmitted(),
       decoration: InputDecoration(
         filled: true,
         fillColor: const Color(0xFF303030),
         hintText: 'Search',
-        hintStyle: Theme.of(
-          context,
-        ).textTheme.titleLarge?.copyWith(color: Colors.white38, fontWeight: FontWeight.w500),
+        hintStyle: Theme.of(context).textTheme.titleLarge?.copyWith(
+          color: Colors.white38,
+          fontWeight: FontWeight.w500,
+        ),
         prefixIcon: const Icon(Icons.search, color: Colors.white54, size: 34),
         suffixIcon: isBusy
             ? const Padding(
@@ -2282,10 +3147,7 @@ class _ResidentSearchInput extends StatelessWidget {
               )
             : IconButton(
                 onPressed: onSubmitted,
-                icon: const Icon(
-                  Icons.mic_none_rounded,
-                  color: Colors.white54,
-                ),
+                icon: const Icon(Icons.mic_none_rounded, color: Colors.white54),
               ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(22),
@@ -2299,7 +3161,10 @@ class _ResidentSearchInput extends StatelessWidget {
           borderRadius: BorderRadius.circular(22),
           borderSide: const BorderSide(color: Color(0xFF31D158), width: 1.5),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 18,
+          vertical: 18,
+        ),
       ),
     );
   }
@@ -2501,12 +3366,12 @@ class _ResidentSearchListTile extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(
-                    context,
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(
+                        context,
                       ).textTheme.bodyLarge?.copyWith(color: Colors.white54),
                     ),
                   ],

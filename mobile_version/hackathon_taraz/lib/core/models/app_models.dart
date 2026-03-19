@@ -189,6 +189,20 @@ extension ReportStatusX on ReportStatus {
     ReportStatus.duplicate => 'duplicate',
     ReportStatus.spam => 'spam',
   };
+
+  bool get isOperationallyOpen => switch (this) {
+    ReportStatus.submitted ||
+    ReportStatus.underReview ||
+    ReportStatus.validated ||
+    ReportStatus.assigned ||
+    ReportStatus.inProgress => true,
+    ReportStatus.draft ||
+    ReportStatus.resolved ||
+    ReportStatus.closed ||
+    ReportStatus.rejected ||
+    ReportStatus.duplicate ||
+    ReportStatus.spam => false,
+  };
 }
 
 ReportStatus reportStatusFromDb(String? value) {
