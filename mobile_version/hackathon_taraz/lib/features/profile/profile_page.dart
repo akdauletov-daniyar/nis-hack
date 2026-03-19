@@ -134,7 +134,7 @@ class ProfilePage extends ConsumerWidget {
               ),
               PulseActionTile(
                 title: 'Logout',
-                subtitle: 'Sign out of Alatau Pulse on this device.',
+                subtitle: 'Sign out of sonar on this device.',
                 icon: Icons.logout,
                 accentColor: AppConstants.accent2Color,
                 onTap: controller.isBusy

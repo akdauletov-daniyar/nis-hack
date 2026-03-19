@@ -31,6 +31,8 @@ class _RoleShellState extends ConsumerState<RoleShell> {
     final controller = ref.watch(appControllerProvider);
     final shellTabs = _tabsForRole(widget.role);
     final theme = Theme.of(context);
+    final shouldLiftSos =
+        widget.role == UserRole.resident && _index == 0;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -79,16 +81,26 @@ class _RoleShellState extends ConsumerState<RoleShell> {
         ),
       ),
       floatingActionButton: _showsSos(widget.role)
-          ? FloatingActionButton(
-              onPressed: () async {
-                final result = await _showSosDialog(context, ref);
-                if (context.mounted && result != null) {
-                  showActionResultSnackBar(context, result);
-                }
-              },
-              child: const Icon(Icons.sos),
+          ? _AnimatedSosFab(
+              animationKey: ValueKey(
+                'sos-${widget.role.name}-${shouldLiftSos ? 'lifted' : 'default'}',
+              ),
+              child: FloatingActionButton(
+                onPressed: () async {
+                  final result = await _showSosDialog(context, ref);
+                  if (context.mounted && result != null) {
+                    showActionResultSnackBar(context, result);
+                  }
+                },
+                elevation: 10,
+                highlightElevation: 14,
+                child: const Icon(Icons.sos),
+              ),
             )
           : null,
+      floatingActionButtonLocation: shouldLiftSos
+          ? const _ResidentMapSosFabLocation()
+          : FloatingActionButtonLocation.endFloat,
       bottomNavigationBar: SafeArea(
         minimum: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         child: Container(
@@ -120,6 +132,63 @@ class _RoleShellState extends ConsumerState<RoleShell> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ResidentMapSosFabLocation extends StandardFabLocation
+    with FabEndOffsetX, FabFloatOffsetY {
+  const _ResidentMapSosFabLocation();
+
+  @override
+  double getOffsetY(ScaffoldPrelayoutGeometry scaffoldGeometry, double adjustment) {
+    final baseOffset = super.getOffsetY(scaffoldGeometry, adjustment);
+    return baseOffset - 240;
+  }
+}
+
+class _AnimatedSosFab extends StatelessWidget {
+  const _AnimatedSosFab({required this.animationKey, required this.child});
+
+  final Key animationKey;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      key: animationKey,
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 420),
+      curve: Curves.easeOutBack,
+      child: child,
+      builder: (context, value, animatedChild) {
+        final shadowBlur = 12 + (value * 20);
+        final shadowSpread = value * 2;
+
+        return Opacity(
+          opacity: value.clamp(0, 1),
+          child: Transform.translate(
+            offset: Offset(0, (1 - value) * 24),
+            child: Transform.scale(
+              scale: 0.84 + (value * 0.16),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0x330B1220).withValues(alpha: value * 0.25),
+                      blurRadius: shadowBlur,
+                      spreadRadius: shadowSpread,
+                      offset: Offset(0, 10 - (value * 2)),
+                    ),
+                  ],
+                ),
+                child: animatedChild,
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -452,7 +521,7 @@ class _ShellHeader extends StatelessWidget {
         children: [
           Expanded(
             child: Text(
-              'ALATAU PULSE',
+              'SONAR',
               style: theme.textTheme.titleMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w800,

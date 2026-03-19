@@ -2,7 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'app/alatau_pulse_app.dart';
+import 'app/sonar_app.dart';
 
 const _supabaseUrl = 'https://zqbxyicjbwwuimcnlubk.supabase.co';
 const _supabasePublishableKey =
@@ -16,5 +16,5 @@ Future<void> main() async {
     anonKey: _supabasePublishableKey,
   );
 
-  runApp(const ProviderScope(child: AlatauPulseApp()));
+  runApp(const ProviderScope(child: SonarApp()));
 }

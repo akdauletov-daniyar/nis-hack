@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "hackathon_taraz" "\0"
+            VALUE "FileDescription", "sonar" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "hackathon_taraz" "\0"
+            VALUE "InternalName", "sonar" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 com.example. All rights reserved." "\0"
-            VALUE "OriginalFilename", "hackathon_taraz.exe" "\0"
-            VALUE "ProductName", "hackathon_taraz" "\0"
+            VALUE "OriginalFilename", "sonar.exe" "\0"
+            VALUE "ProductName", "sonar" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

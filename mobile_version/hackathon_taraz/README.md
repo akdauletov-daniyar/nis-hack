@@ -1,4 +1,4 @@
-# hackathon_taraz
+# sonar
 
 A new Flutter project.
 

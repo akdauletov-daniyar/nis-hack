@@ -508,7 +508,7 @@ class _SplashPage extends StatelessWidget {
               ),
               const SizedBox(height: 20),
               Text(
-                'Loading Alatau Pulse...',
+                'Loading sonar...',
                 style: Theme.of(
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),

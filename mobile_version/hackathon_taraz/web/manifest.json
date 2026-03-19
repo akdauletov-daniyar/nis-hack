@@ -1,6 +1,6 @@
 {
-    "name": "hackathon_taraz",
-    "short_name": "hackathon_taraz",
+    "name": "sonar",
+    "short_name": "sonar",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

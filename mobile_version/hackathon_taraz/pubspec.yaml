@@ -1,5 +1,5 @@
-name: hackathon_taraz
-description: "Alatau Pulse mobile MVP for smart city operations and Barrier-Free Alatau."
+name: sonar
+description: "sonar mobile MVP for smart city operations and Barrier-Free Alatau."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -35,7 +35,9 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   flutter_riverpod: ^2.6.1
+  geolocator: ^14.0.2
   google_maps_flutter: 
+  http: ^1.2.2
   supabase_flutter: ^2.12.0
   shared_preferences: ^2.5.3
 
