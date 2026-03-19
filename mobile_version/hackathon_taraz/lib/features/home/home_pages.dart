@@ -12,7 +12,8 @@ class ResidentHomePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final controller = ref.watch(appControllerProvider);
-    final route = controller.activeRoutePreview;
+    final routePlan = controller.activeRoutePlan;
+    final route = routePlan.primaryRoute;
     final unresolvedReports = controller.myReports
         .where((report) => report.status != ReportStatus.closed)
         .length;
@@ -52,6 +53,31 @@ class ResidentHomePage extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
+                routePlan.safetyHint,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                routePlan.dataConfidence,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              if (routePlan.fallbackMessage != null) ...[
+                const SizedBox(height: 12),
+                PulseTag(
+                  routePlan.fallbackMessage!,
+                  icon: Icons.info_outline,
+                  backgroundColor: AppConstants.mainAccentColor.withValues(
+                    alpha: 0.10,
+                  ),
+                  foregroundColor: AppConstants.mainAccentColor,
+                ),
+              ],
+              const SizedBox(height: 16),
+              Text(
                 'Safe highlights',
                 style: Theme.of(
                   context,
@@ -68,6 +94,20 @@ class ResidentHomePage extends ConsumerWidget {
               ),
               const SizedBox(height: 10),
               ...route.warnings.map((line) => _BulletLine(text: line)),
+              if (routePlan.alternativeRoute != null) ...[
+                const SizedBox(height: 16),
+                Text(
+                  'Alternative route',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                _BulletLine(
+                  text:
+                      '${routePlan.alternativeRoute!.title} • ${routePlan.alternativeRoute!.etaMinutes} min ETA',
+                ),
+              ],
             ],
           ),
         ),

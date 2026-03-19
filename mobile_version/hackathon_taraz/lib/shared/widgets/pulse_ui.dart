@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_constants.dart';
+import '../../core/models/app_models.dart';
 
 class PulseBackdrop extends StatelessWidget {
   const PulseBackdrop({super.key, required this.child});
@@ -871,6 +872,22 @@ class _PulseChoiceIcon extends StatelessWidget {
       child: Icon(icon, color: color, size: 18),
     );
   }
+}
+
+void showActionResultSnackBar(BuildContext context, ActionResult result) {
+  final messenger = ScaffoldMessenger.of(context);
+  final scheme = Theme.of(context).colorScheme;
+  final isError = !result.success;
+
+  messenger
+    ..hideCurrentSnackBar()
+    ..showSnackBar(
+      SnackBar(
+        content: Text(result.message),
+        backgroundColor: isError ? const Color(0xFFB42318) : scheme.primary,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
 }
 
 class _GlowBubble extends StatelessWidget {

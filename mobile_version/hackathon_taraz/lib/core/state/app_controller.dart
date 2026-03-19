@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../constants/app_constants.dart';
@@ -20,6 +21,8 @@ class AppController extends ChangeNotifier {
     unawaited(_hydrateSession());
   }
 
+  static const _activeRolePrefsKey = 'active_role';
+
   final SupabaseClient _client = Supabase.instance.client;
   StreamSubscription<AuthState>? _authSubscription;
   final Random _random = Random();
@@ -34,7 +37,12 @@ class AppController extends ChangeNotifier {
   UserRole? activeRole;
 
   bool barrierFreeMode = true;
-  String districtFilter = 'All districts';
+  bool showReportLayer = true;
+  bool showIncidentLayer = true;
+  bool showBarrierLayer = true;
+  bool _checkedDemoSeed = false;
+  String routeStartLabel = AppConstants.routeLandmarks.first.label;
+  String routeDestinationLabel = AppConstants.routeLandmarks[1].label;
 
   List<Organization> organizations = const [];
   List<AppUser> managedUsers = const [];
@@ -84,6 +92,32 @@ class AppController extends ChangeNotifier {
         .toList();
   }
 
+  List<CityLandmark> get routeLandmarks {
+    final savedPlaceLandmarks = (currentUser?.savedPlaces ?? const [])
+        .map(
+          (place) => CityLandmark(
+            label: place,
+            district: currentUser?.district ?? AppConstants.defaultDistrict,
+            description: 'Saved place from the resident profile.',
+          ),
+        )
+        .toList();
+
+    final merged = [...AppConstants.routeLandmarks];
+    for (final landmark in savedPlaceLandmarks) {
+      final alreadyExists = merged.any((item) => item.label == landmark.label);
+      if (!alreadyExists) {
+        merged.add(landmark);
+      }
+    }
+    return merged;
+  }
+
+  CityLandmark get selectedRouteStart => _landmarkForLabel(routeStartLabel);
+
+  CityLandmark get selectedRouteDestination =>
+      _landmarkForLabel(routeDestinationLabel);
+
   List<MapObstacle> get obstacles {
     return reports
         .where(
@@ -105,63 +139,106 @@ class AppController extends ChangeNotifier {
         .toList();
   }
 
-  RoutePreview get activeRoutePreview {
+  RoutePlan get activeRoutePlan {
     final profile = currentUser?.profile.mobilityType ?? MobilityType.general;
+    final destination = selectedRouteDestination;
+    final relevantReports = reports
+        .where(
+          (report) =>
+              report.district == destination.district &&
+              report.status != ReportStatus.closed &&
+              report.status != ReportStatus.rejected &&
+              report.status != ReportStatus.spam,
+        )
+        .toList();
+    final relevantObstacles = relevantReports
+        .where((report) => report.accessibilityRelated)
+        .toList();
+    final obstaclePressure = relevantObstacles.length;
+    final liveSignals = relevantReports.length;
+    final routePrefix = barrierFreeMode ? 'Barrier-free' : 'Fastest';
 
-    if (!barrierFreeMode) {
-      return const RoutePreview(
-        title: 'Fastest route to City Hall',
-        etaMinutes: 16,
-        highlights: [
-          'Shortest corridor through Central Avenue',
-          'Main crossings prioritized',
-        ],
-        warnings: ['Includes stairs near the underpass'],
-      );
-    }
-
-    return switch (profile) {
-      MobilityType.wheelchair => const RoutePreview(
-        title: 'Barrier-free route to Clinic No. 4',
-        etaMinutes: 19,
-        highlights: [
-          'Avoids stairs and steep slopes',
-          'Uses curb-cut crossings',
-          'Reroutes around broken clinic elevator',
-        ],
-        warnings: ['Temporary detour near North Station ramp'],
-      ),
-      MobilityType.lowVision => const RoutePreview(
-        title: 'High-clarity route to Akimat',
-        etaMinutes: 17,
-        highlights: ['Better lit streets', 'Fewer unprotected crossings'],
-        warnings: ['Street light outage near East River crossing'],
-      ),
-      MobilityType.elderly => const RoutePreview(
-        title: 'Low-stress walking route',
-        etaMinutes: 18,
-        highlights: [
-          'Minimizes stairs and long climbs',
-          'Includes rest points near pharmacies',
-        ],
-        warnings: ['Construction narrows sidewalk on School Street'],
-      ),
-      MobilityType.stroller => const RoutePreview(
-        title: 'Stroller-friendly route to playground',
-        etaMinutes: 15,
-        highlights: ['Smooth curb ramps', 'Wider pedestrian corridors'],
-        warnings: ['Temporary fence blocks direct crossing'],
-      ),
-      MobilityType.general => const RoutePreview(
-        title: 'Balanced route through Alatau Central',
-        etaMinutes: 14,
-        highlights: [
-          'Combines speed and safety',
-          'Avoids the busiest hazard cluster',
-        ],
-        warnings: ['Monitor smoke response near Bazaar Square'],
-      ),
+    final generalHighlights = <String>[
+      'Starts from ${selectedRouteStart.label}',
+      'Destination: ${destination.label}',
+      if (barrierFreeMode) 'Uses accessibility-aware detours when needed',
+      if (!barrierFreeMode) 'Optimizes travel time over accessibility detours',
+    ];
+    final mobilityHighlights = switch (profile) {
+      MobilityType.wheelchair => [
+        'Avoids stairs and broken elevator corridors when possible',
+        'Prefers curb-cut crossings and smoother surfaces',
+      ],
+      MobilityType.lowVision => [
+        'Prefers clearer crossings and simpler turns',
+        'Keeps route instructions short and legible',
+      ],
+      MobilityType.elderly => [
+        'Reduces long climbs and sharp slope changes',
+        'Keeps rest-stop friendly corridors in view',
+      ],
+      MobilityType.stroller => [
+        'Prefers wider sidewalks and ramps',
+        'Avoids chokepoints and tight detours',
+      ],
+      MobilityType.general => [
+        'Balances speed, safety, and live city conditions',
+        'Avoids the busiest issue clusters when possible',
+      ],
     };
+    final warnings = <String>[
+      if (obstaclePressure > 0)
+        ...relevantObstacles.take(2).map(
+          (obstacle) => '${obstacle.category} near ${obstacle.location}',
+        )
+      else
+        'Limited live accessibility data, using profile defaults.',
+      if (!barrierFreeMode) 'Barrier-free filters are currently turned off.',
+    ];
+    final etaBase = switch (profile) {
+      MobilityType.wheelchair => 18,
+      MobilityType.lowVision => 17,
+      MobilityType.elderly => 19,
+      MobilityType.stroller => 16,
+      MobilityType.general => 14,
+    };
+    final etaMinutes = etaBase + (barrierFreeMode ? obstaclePressure : 0);
+    final alternativeRoute = barrierFreeMode && obstaclePressure >= 2
+        ? RouteLeg(
+            title:
+                'Fallback route via ${destination.district} service corridor',
+            etaMinutes: etaMinutes + 3,
+            district: destination.district,
+            highlights: const [
+              'Trades a few minutes for a calmer path',
+              'Avoids the densest live barrier cluster',
+            ],
+            warnings: const [
+              'Fewer live confirmations are available on this alternative',
+            ],
+          )
+        : null;
+
+    return RoutePlan(
+      primaryRoute: RouteLeg(
+        title:
+            '$routePrefix route to ${destination.label}',
+        etaMinutes: etaMinutes,
+        district: destination.district,
+        highlights: [...generalHighlights, ...mobilityHighlights],
+        warnings: warnings,
+      ),
+      alternativeRoute: alternativeRoute,
+      safetyHint: obstaclePressure >= 2
+          ? 'High obstacle pressure detected near the destination. Keep extra time for detours.'
+          : 'No major blocker cluster detected on the active route.',
+      dataConfidence: liveSignals == 0
+          ? 'Low confidence: using profile defaults and district heuristics.'
+          : 'Moderate confidence: using $liveSignals live city update(s) in ${destination.district}.',
+      fallbackMessage: liveSignals == 0
+          ? 'Limited live accessibility data, using profile defaults.'
+          : null,
+    );
   }
 
   Future<void> signInWithEmail({
@@ -233,6 +310,8 @@ class AppController extends ChangeNotifier {
     _setBusy(true);
     try {
       await _client.auth.signOut();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_activeRolePrefsKey);
       currentUser = null;
       activeRole = null;
       organizations = const [];
@@ -242,6 +321,7 @@ class AppController extends ChangeNotifier {
       notifications = const [];
       announcements = const [];
       dataError = null;
+      _checkedDemoSeed = false;
     } finally {
       _setBusy(false);
       notifyListeners();
@@ -250,11 +330,13 @@ class AppController extends ChangeNotifier {
 
   void selectRole(UserRole role) {
     activeRole = role;
+    unawaited(_persistActiveRole(role));
     notifyListeners();
   }
 
   void switchRole(UserRole role) {
     activeRole = role;
+    unawaited(_persistActiveRole(role));
     notifyListeners();
   }
 
@@ -265,15 +347,41 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> setBarrierFreeMode(bool enabled) async {
+  Future<ActionResult> setBarrierFreeMode(bool enabled) async {
     barrierFreeMode = enabled;
+    notifyListeners();
+    return ActionResult.success(
+      enabled
+          ? 'Barrier-free routing enabled.'
+          : 'Barrier-free routing disabled.',
+    );
+  }
+
+  void setRouteStart(String label) {
+    routeStartLabel = label;
     notifyListeners();
   }
 
-  Future<void> setMobilityType(MobilityType mobilityType) async {
+  void setRouteDestination(String label) {
+    routeDestinationLabel = label;
+    notifyListeners();
+  }
+
+  void toggleMapLayer(MapLayer layer) {
+    if (layer == MapLayer.reports) {
+      showReportLayer = !showReportLayer;
+    } else if (layer == MapLayer.incidents) {
+      showIncidentLayer = !showIncidentLayer;
+    } else {
+      showBarrierLayer = !showBarrierLayer;
+    }
+    notifyListeners();
+  }
+
+  Future<ActionResult> setMobilityType(MobilityType mobilityType) async {
     final user = currentUser;
     if (user == null) {
-      return;
+      return const ActionResult.failure('Sign in again to update your profile.');
     }
 
     _setBusy(true);
@@ -287,28 +395,33 @@ class AppController extends ChangeNotifier {
         profile: user.profile.copyWith(mobilityType: mobilityType),
       );
       authMessage = 'Accessibility profile updated.';
+      return const ActionResult.success('Accessibility profile updated.');
     } catch (error) {
       authError = _friendlyError(error);
+      return ActionResult.failure(authError!);
     } finally {
       _setBusy(false);
       notifyListeners();
     }
   }
 
-  Future<void> submitReport({
+  Future<ActionResult> submitReport({
     required String category,
     required String description,
+    required String district,
+    required String locationDetails,
     required UrgencyLevel urgency,
     required bool accessibilityRelated,
+    String? attachmentLabel,
   }) async {
     final user = currentUser;
     if (user == null) {
-      return;
+      return const ActionResult.failure('Sign in again to submit a report.');
     }
 
     _setBusy(true);
     try {
-      final coords = _coordinatesForDistrict(user.district);
+      final coords = _coordinatesForDistrict(district);
       final insertedReport = await _client
           .from('reports')
           .insert({
@@ -320,11 +433,13 @@ class AppController extends ChangeNotifier {
             'description': description,
             'status': ReportStatus.submitted.dbValue,
             'urgency': urgency.dbValue,
-            'district': user.district,
-            'location_text': 'Submitted from mobile app',
+            'district': district,
+            'location_text': locationDetails,
             'latitude': coords.$1,
             'longitude': coords.$2,
             'accessibility_related': accessibilityRelated,
+            if (attachmentLabel != null && attachmentLabel.isNotEmpty)
+              'photo_url': attachmentLabel,
           })
           .select()
           .single();
@@ -342,7 +457,7 @@ class AppController extends ChangeNotifier {
           'title': category,
           'status': IncidentStatus.newIncident.dbValue,
           'urgency': urgency.dbValue,
-          'district': user.district,
+          'district': district,
           'reporter_name': user.name,
           'reporter_phone': user.phone,
           'assigned_organization_id': AppConstants.emsOrganizationId,
@@ -353,23 +468,29 @@ class AppController extends ChangeNotifier {
 
       authMessage = 'Report submitted successfully.';
       await _loadData();
+      return const ActionResult.success('Report submitted successfully.');
     } catch (error) {
       authError = _friendlyError(error);
+      return ActionResult.failure(authError!);
     } finally {
       _setBusy(false);
       notifyListeners();
     }
   }
 
-  Future<void> triggerSos() async {
+  Future<ActionResult> triggerSos({
+    required SosType sosType,
+    required String district,
+    required String locationDetails,
+  }) async {
     final user = currentUser;
     if (user == null) {
-      return;
+      return const ActionResult.failure('Sign in again to send SOS.');
     }
 
     _setBusy(true);
     try {
-      final coords = _coordinatesForDistrict(user.district);
+      final coords = _coordinatesForDistrict(district);
       final report = await _client
           .from('reports')
           .insert({
@@ -377,13 +498,13 @@ class AppController extends ChangeNotifier {
             'reporter_name': user.name,
             'reporter_phone': user.phone,
             'title': 'SOS emergency from mobile user',
-            'category': 'SOS',
+            'category': sosType.label,
             'description':
-                'Emergency assistance requested through the resident SOS flow.',
+                'Emergency assistance requested through the resident SOS flow. Type: ${sosType.label}.',
             'status': ReportStatus.validated.dbValue,
             'urgency': UrgencyLevel.critical.dbValue,
-            'district': user.district,
-            'location_text': 'Live GPS pin',
+            'district': district,
+            'location_text': locationDetails,
             'latitude': coords.$1,
             'longitude': coords.$2,
             'accessibility_related': false,
@@ -395,10 +516,10 @@ class AppController extends ChangeNotifier {
       await _client.from('incidents').insert({
         'report_id': report['id'],
         'created_by_user_id': user.id,
-        'title': 'SOS dispatch requested',
+        'title': 'SOS dispatch requested: ${sosType.label}',
         'status': IncidentStatus.newIncident.dbValue,
         'urgency': UrgencyLevel.critical.dbValue,
-        'district': user.district,
+        'district': district,
         'reporter_name': user.name,
         'reporter_phone': user.phone,
         'assigned_organization_id': AppConstants.emsOrganizationId,
@@ -413,20 +534,22 @@ class AppController extends ChangeNotifier {
       );
       authMessage = 'SOS sent successfully.';
       await _loadData();
+      return const ActionResult.success('SOS sent successfully.');
     } catch (error) {
       authError = _friendlyError(error);
+      return ActionResult.failure(authError!);
     } finally {
       _setBusy(false);
       notifyListeners();
     }
   }
 
-  Future<void> progressIncident(String incidentId) async {
+  Future<ActionResult> progressIncident(String incidentId) async {
     final incident = incidents
         .where((item) => item.id == incidentId)
         .firstOrNull;
     if (incident == null) {
-      return;
+      return const ActionResult.failure('Incident not found.');
     }
 
     final nextStatus = switch (incident.status) {
@@ -471,20 +594,24 @@ class AppController extends ChangeNotifier {
 
       authMessage = 'Incident updated.';
       await _loadData();
+      return ActionResult.success(
+        'Incident moved to ${nextStatus.label.toLowerCase()}.',
+      );
     } catch (error) {
       authError = _friendlyError(error);
+      return ActionResult.failure(authError!);
     } finally {
       _setBusy(false);
       notifyListeners();
     }
   }
 
-  Future<void> transferIncident(String incidentId) async {
+  Future<ActionResult> transferIncident(String incidentId) async {
     final incident = incidents
         .where((item) => item.id == incidentId)
         .firstOrNull;
     if (incident == null) {
-      return;
+      return const ActionResult.failure('Incident not found.');
     }
 
     _setBusy(true);
@@ -515,16 +642,18 @@ class AppController extends ChangeNotifier {
 
       authMessage = 'Incident transferred.';
       await _loadData();
+      return const ActionResult.success('Incident transferred.');
     } catch (error) {
       authError = _friendlyError(error);
+      return ActionResult.failure(authError!);
     } finally {
       _setBusy(false);
       notifyListeners();
     }
   }
 
-  Future<void> validateReport(String reportId) async {
-    await _updateReportStatus(
+  Future<ActionResult> validateReport(String reportId) async {
+    return _updateReportStatus(
       reportId,
       ReportStatus.validated,
       organizationId: AppConstants.akimatOrganizationId,
@@ -533,17 +662,23 @@ class AppController extends ChangeNotifier {
     );
   }
 
-  Future<void> rejectReport(String reportId) async {
-    await _updateReportStatus(
+  Future<ActionResult> rejectReport(
+    String reportId, {
+    required String reason,
+  }) async {
+    return _updateReportStatus(
       reportId,
       ReportStatus.rejected,
       notificationTitle: 'Report rejected',
-      notificationBody: 'Your report was rejected after review.',
+      notificationBody: 'Your report was rejected after review. Reason: $reason',
     );
   }
 
-  Future<void> assignReport(String reportId, String organizationId) async {
-    await _updateReportStatus(
+  Future<ActionResult> assignReport(
+    String reportId,
+    String organizationId,
+  ) async {
+    return _updateReportStatus(
       reportId,
       ReportStatus.assigned,
       organizationId: organizationId,
@@ -553,10 +688,14 @@ class AppController extends ChangeNotifier {
     );
   }
 
-  Future<void> publishAnnouncement(String title, String body) async {
+  Future<ActionResult> publishAnnouncement({
+    required String title,
+    required String body,
+    required String district,
+  }) async {
     final user = currentUser;
     if (user == null) {
-      return;
+      return const ActionResult.failure('Sign in again to publish an alert.');
     }
 
     _setBusy(true);
@@ -565,17 +704,17 @@ class AppController extends ChangeNotifier {
         'title': title,
         'body': body,
         'severity': 'Notice',
-        'district': districtFilter == 'All districts'
-            ? user.district
-            : districtFilter,
+        'district': district,
         'author_user_id': user.id,
       });
 
       await _notifyUser(user.id, title: 'Announcement published', body: title);
       authMessage = 'Announcement published.';
       await _loadData();
+      return const ActionResult.success('Announcement published.');
     } catch (error) {
       authError = _friendlyError(error);
+      return ActionResult.failure(authError!);
     } finally {
       _setBusy(false);
       notifyListeners();
@@ -607,8 +746,11 @@ class AppController extends ChangeNotifier {
     }
   }
 
-  Future<void> moderateReport(String reportId, ReportStatus status) async {
-    await _updateReportStatus(
+  Future<ActionResult> moderateReport(
+    String reportId,
+    ReportStatus status,
+  ) async {
+    return _updateReportStatus(
       reportId,
       status,
       notificationTitle: 'Report moderation update',
@@ -617,7 +759,7 @@ class AppController extends ChangeNotifier {
     );
   }
 
-  Future<void> grantRoleToUser(String userId, UserRole role) async {
+  Future<ActionResult> grantRoleToUser(String userId, UserRole role) async {
     _setBusy(true);
     try {
       await _client.from('role_assignments').upsert({
@@ -633,8 +775,79 @@ class AppController extends ChangeNotifier {
       );
       authMessage = '${role.label} granted successfully.';
       await _loadData();
+      return ActionResult.success('${role.label} granted successfully.');
     } catch (error) {
       authError = _friendlyError(error);
+      return ActionResult.failure(authError!);
+    } finally {
+      _setBusy(false);
+      notifyListeners();
+    }
+  }
+
+  Future<ActionResult> removeRoleFromUser(String userId, UserRole role) async {
+    final managedUser = managedUsers.where((user) => user.id == userId).firstOrNull;
+    if (managedUser != null && managedUser.roles.length <= 1) {
+      return const ActionResult.failure(
+        'Each account must keep at least one active role.',
+      );
+    }
+
+    _setBusy(true);
+    try {
+      await _client
+          .from('role_assignments')
+          .delete()
+          .eq('user_id', userId)
+          .eq('role', role.dbValue);
+
+      if (currentUser?.id == userId && activeRole == role) {
+        final remainingRoles = (currentUser?.roles ?? const [])
+            .where((item) => item != role)
+            .toList();
+        activeRole = remainingRoles.isEmpty ? null : remainingRoles.first;
+        if (activeRole == null) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.remove(_activeRolePrefsKey);
+        } else {
+          await _persistActiveRole(activeRole!);
+        }
+      }
+
+      authMessage = '${role.label} removed successfully.';
+      if (currentUser?.id == userId) {
+        await _loadCurrentUser(userId);
+      }
+      await _loadData();
+      return ActionResult.success('${role.label} removed successfully.');
+    } catch (error) {
+      authError = _friendlyError(error);
+      return ActionResult.failure(authError!);
+    } finally {
+      _setBusy(false);
+      notifyListeners();
+    }
+  }
+
+  Future<ActionResult> createOrganization({
+    required String name,
+    required OrganizationType type,
+    required List<String> districts,
+  }) async {
+    _setBusy(true);
+    try {
+      await _client.from('organizations').insert({
+        'name': name.trim(),
+        'type': type.dbValue,
+        'districts': districts,
+      });
+
+      authMessage = 'Organization created successfully.';
+      await _loadData();
+      return const ActionResult.success('Organization created successfully.');
+    } catch (error) {
+      authError = _friendlyError(error);
+      return ActionResult.failure(authError!);
     } finally {
       _setBusy(false);
       notifyListeners();
@@ -664,6 +877,11 @@ class AppController extends ChangeNotifier {
       incidents = const [];
       notifications = const [];
       announcements = const [];
+      showReportLayer = true;
+      showIncidentLayer = true;
+      showBarrierLayer = true;
+      routeStartLabel = AppConstants.routeLandmarks.first.label;
+      routeDestinationLabel = AppConstants.routeLandmarks[1].label;
       isHydrating = false;
       notifyListeners();
       return;
@@ -673,7 +891,19 @@ class AppController extends ChangeNotifier {
       await _ensureProfile(authUser);
       await _loadCurrentUser(authUser.id);
       await _loadData();
-      if (availableRoles.length == 1) {
+      if (!_checkedDemoSeed) {
+        final seeded = await _seedDemoDataIfNeeded();
+        _checkedDemoSeed = true;
+        if (seeded) {
+          await _loadCurrentUser(authUser.id);
+          await _loadData();
+        }
+      }
+
+      final persistedRole = await _readPersistedActiveRole();
+      if (persistedRole != null && availableRoles.contains(persistedRole)) {
+        activeRole = persistedRole;
+      } else if (availableRoles.length == 1) {
         activeRole = availableRoles.first;
       } else if (activeRole != null && !availableRoles.contains(activeRole)) {
         activeRole = null;
@@ -851,7 +1081,7 @@ class AppController extends ChangeNotifier {
     }
   }
 
-  Future<void> _updateReportStatus(
+  Future<ActionResult> _updateReportStatus(
     String reportId,
     ReportStatus status, {
     String? organizationId,
@@ -860,7 +1090,7 @@ class AppController extends ChangeNotifier {
   }) async {
     final report = reports.where((item) => item.id == reportId).firstOrNull;
     if (report == null) {
-      return;
+      return const ActionResult.failure('Report not found.');
     }
 
     _setBusy(true);
@@ -882,8 +1112,10 @@ class AppController extends ChangeNotifier {
 
       authMessage = 'Report updated.';
       await _loadData();
+      return ActionResult.success('Report moved to ${status.label}.');
     } catch (error) {
       authError = _friendlyError(error);
+      return ActionResult.failure(authError!);
     } finally {
       _setBusy(false);
       notifyListeners();
@@ -926,6 +1158,155 @@ class AppController extends ChangeNotifier {
     isBusy = value;
   }
 
+  Future<void> _persistActiveRole(UserRole role) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_activeRolePrefsKey, role.dbValue);
+  }
+
+  Future<UserRole?> _readPersistedActiveRole() async {
+    final prefs = await SharedPreferences.getInstance();
+    final value = prefs.getString(_activeRolePrefsKey);
+    if (value == null) {
+      return null;
+    }
+    return userRoleFromDb(value);
+  }
+
+  Future<bool> _seedDemoDataIfNeeded() async {
+    final user = currentUser;
+    if (user == null) {
+      return false;
+    }
+
+    var seeded = false;
+
+    if (user.savedPlaces.isEmpty) {
+      await _client.from('saved_places').insert([
+        {
+          'user_id': user.id,
+          'label': 'Home',
+        },
+        {
+          'user_id': user.id,
+          'label': 'Clinic No. 4',
+        },
+        {
+          'user_id': user.id,
+          'label': 'Akimat',
+        },
+      ]);
+      seeded = true;
+    }
+
+    if (reports.isEmpty) {
+      final sampleReports = await _client
+          .from('reports')
+          .insert([
+            {
+              'reporter_user_id': user.id,
+              'reporter_name': user.name,
+              'reporter_phone': user.phone,
+              'title': 'Blocked sidewalk near Bazaar Square',
+              'category': 'Blocked sidewalk',
+              'description':
+                  'Construction fencing narrows the sidewalk and blocks wheelchair access.',
+              'status': ReportStatus.submitted.dbValue,
+              'urgency': UrgencyLevel.high.dbValue,
+              'district': 'East River',
+              'location_text': 'Bazaar Square north crossing',
+              'latitude': 43.2337,
+              'longitude': 76.8826,
+              'accessibility_related': true,
+              'photo_url': 'sidewalk-photo.jpg',
+            },
+            {
+              'reporter_user_id': user.id,
+              'reporter_name': user.name,
+              'reporter_phone': user.phone,
+              'title': 'Broken elevator at Clinic No. 4',
+              'category': 'Broken elevator',
+              'description':
+                  'Elevator is out of service, forcing patients onto stairs.',
+              'status': ReportStatus.assigned.dbValue,
+              'urgency': UrgencyLevel.critical.dbValue,
+              'district': 'North Station',
+              'location_text': 'Clinic No. 4 main entrance',
+              'latitude': 43.2435,
+              'longitude': 76.8883,
+              'accessibility_related': true,
+              'assigned_organization_id': AppConstants.akimatOrganizationId,
+              'photo_url': 'ramp-photo.jpg',
+            },
+            {
+              'reporter_user_id': user.id,
+              'reporter_name': user.name,
+              'reporter_phone': user.phone,
+              'title': 'Broken traffic light on Central Avenue',
+              'category': 'Broken traffic light',
+              'description':
+                  'Traffic light is dark during peak hours and creates a dangerous crossing.',
+              'status': ReportStatus.validated.dbValue,
+              'urgency': UrgencyLevel.high.dbValue,
+              'district': 'Alatau Central',
+              'location_text': 'Central Avenue and School Street',
+              'latitude': 43.2389,
+              'longitude': 76.8897,
+              'accessibility_related': false,
+              'assigned_organization_id': AppConstants.akimatOrganizationId,
+            },
+          ])
+          .select();
+
+      final reportMaps = _asMapList(sampleReports);
+      final criticalReport = reportMaps
+          .where((report) => report['category'] == 'Broken elevator')
+          .firstOrNull;
+      if (criticalReport != null) {
+        await _client.from('incidents').insert({
+          'report_id': criticalReport['id'],
+          'created_by_user_id': user.id,
+          'title': 'Critical elevator outage at Clinic No. 4',
+          'status': IncidentStatus.assigned.dbValue,
+          'urgency': UrgencyLevel.critical.dbValue,
+          'district': 'North Station',
+          'reporter_name': user.name,
+          'reporter_phone': user.phone,
+          'assigned_organization_id': AppConstants.emsOrganizationId,
+          'latitude': 43.2435,
+          'longitude': 76.8883,
+        });
+      }
+      seeded = true;
+    }
+
+    if (announcements.isEmpty &&
+        (availableRoles.contains(UserRole.government) ||
+            availableRoles.contains(UserRole.admin) ||
+            availableRoles.contains(UserRole.emergencyService))) {
+      await _client.from('announcements').insert([
+        {
+          'author_user_id': user.id,
+          'title': 'Barrier-Free Alatau advisory',
+          'body':
+              'City teams are rerouting pedestrians around a blocked sidewalk near Bazaar Square.',
+          'severity': 'Notice',
+          'district': 'East River',
+        },
+        {
+          'author_user_id': user.id,
+          'title': 'Clinic elevator response in progress',
+          'body':
+              'Emergency and Akimat teams are coordinating around the elevator outage at Clinic No. 4.',
+          'severity': 'Notice',
+          'district': 'North Station',
+        },
+      ]);
+      seeded = true;
+    }
+
+    return seeded;
+  }
+
   String _organizationIdForRole(UserRole role) {
     return switch (role) {
       UserRole.resident => AppConstants.adminOrganizationId,
@@ -959,6 +1340,13 @@ class AppController extends ChangeNotifier {
       ];
     }
     return const [MobilityType.general];
+  }
+
+  CityLandmark _landmarkForLabel(String label) {
+    return routeLandmarks
+            .where((landmark) => landmark.label == label)
+            .firstOrNull ??
+        routeLandmarks.first;
   }
 
   (double, double) _coordinatesForDistrict(String district) {

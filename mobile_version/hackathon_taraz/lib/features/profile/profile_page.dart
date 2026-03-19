@@ -5,9 +5,36 @@ import '../../core/constants/app_constants.dart';
 import '../../core/models/app_models.dart';
 import '../../core/state/app_controller.dart';
 import '../../shared/widgets/pulse_ui.dart';
+import '../notifications/notifications_page.dart';
 
 class ProfilePage extends ConsumerWidget {
   const ProfilePage({super.key});
+
+  Future<void> _showRolePicker(BuildContext context, WidgetRef ref) async {
+    final controller = ref.read(appControllerProvider);
+
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (context) {
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: controller.availableRoles.map((role) {
+              return ListTile(
+                leading: const Icon(Icons.swap_horiz_rounded),
+                title: Text(role.label),
+                subtitle: Text(role.description),
+                onTap: () {
+                  controller.switchRole(role);
+                  Navigator.of(context).pop();
+                },
+              );
+            }).toList(),
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -25,6 +52,20 @@ class ProfilePage extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              PulseInfoRow(
+                icon: Icons.person_outline,
+                label: 'Full name',
+                value: user.name,
+                accentColor: AppConstants.mainAccentColor,
+              ),
+              const SizedBox(height: 14),
+              PulseInfoRow(
+                icon: Icons.email_outlined,
+                label: 'Email',
+                value: user.email.isEmpty ? 'Not provided' : user.email,
+                accentColor: AppConstants.secondaryAccentColor,
+              ),
+              const SizedBox(height: 14),
               PulseInfoRow(
                 icon: Icons.location_city_outlined,
                 label: 'Primary district',
@@ -53,6 +94,54 @@ class ProfilePage extends ConsumerWidget {
                       ),
                     )
                     .toList(),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        PulseSectionCard(
+          title: 'Quick actions',
+          subtitle:
+              'Switch roles, read notifications, or sign out without leaving the mobile shell.',
+          child: PulseWrapGrid(
+            minItemWidth: 170,
+            children: [
+              PulseActionTile(
+                title: 'Notifications',
+                subtitle:
+                    '${controller.unreadNotificationCount} unread update(s) waiting in the in-app center.',
+                icon: Icons.notifications_none_rounded,
+                accentColor: AppConstants.secondaryAccentColor,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const NotificationsPage(),
+                    ),
+                  );
+                },
+              ),
+              PulseActionTile(
+                title: 'Switch role',
+                subtitle:
+                    controller.availableRoles.length > 1
+                    ? 'Move between resident, emergency, government, or admin workspaces.'
+                    : 'This account currently has one active role.',
+                icon: Icons.swap_horiz_rounded,
+                accentColor: AppConstants.mainAccentColor,
+                onTap: controller.availableRoles.length > 1
+                    ? () => _showRolePicker(context, ref)
+                    : null,
+              ),
+              PulseActionTile(
+                title: 'Logout',
+                subtitle: 'Sign out of Alatau Pulse on this device.',
+                icon: Icons.logout,
+                accentColor: AppConstants.accent2Color,
+                onTap: controller.isBusy
+                    ? null
+                    : () async {
+                        await ref.read(appControllerProvider).signOut();
+                      },
               ),
             ],
           ),

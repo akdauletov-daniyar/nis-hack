@@ -1,5 +1,21 @@
 enum UserRole { resident, emergencyService, government, admin }
 
+class ActionResult {
+  const ActionResult._({
+    required this.success,
+    required this.message,
+  });
+
+  const ActionResult.success(String message)
+    : this._(success: true, message: message);
+
+  const ActionResult.failure(String message)
+    : this._(success: false, message: message);
+
+  final bool success;
+  final String message;
+}
+
 extension UserRoleX on UserRole {
   String get label => switch (this) {
     UserRole.resident => 'Resident',
@@ -82,6 +98,20 @@ extension MobilityTypeX on MobilityType {
     MobilityType.general => 'general',
   };
 }
+
+enum SosType { medical, fire, accident, safety, accessibility }
+
+extension SosTypeX on SosType {
+  String get label => switch (this) {
+    SosType.medical => 'Medical',
+    SosType.fire => 'Fire / Smoke',
+    SosType.accident => 'Accident',
+    SosType.safety => 'Suspicious situation',
+    SosType.accessibility => 'Accessibility emergency',
+  };
+}
+
+enum MapLayer { reports, incidents, barriers }
 
 MobilityType mobilityTypeFromDb(String? value) {
   return switch (value) {
@@ -574,6 +604,18 @@ class Announcement {
   final String createdAtLabel;
 }
 
+class CityLandmark {
+  const CityLandmark({
+    required this.label,
+    required this.district,
+    required this.description,
+  });
+
+  final String label;
+  final String district;
+  final String description;
+}
+
 class MapObstacle {
   const MapObstacle({
     required this.id,
@@ -590,18 +632,36 @@ class MapObstacle {
   final bool active;
 }
 
-class RoutePreview {
-  const RoutePreview({
+class RouteLeg {
+  const RouteLeg({
     required this.title,
     required this.etaMinutes,
     required this.highlights,
     required this.warnings,
+    required this.district,
   });
 
   final String title;
   final int etaMinutes;
   final List<String> highlights;
   final List<String> warnings;
+  final String district;
+}
+
+class RoutePlan {
+  const RoutePlan({
+    required this.primaryRoute,
+    this.alternativeRoute,
+    required this.safetyHint,
+    required this.dataConfidence,
+    this.fallbackMessage,
+  });
+
+  final RouteLeg primaryRoute;
+  final RouteLeg? alternativeRoute;
+  final String safetyHint;
+  final String dataConfidence;
+  final String? fallbackMessage;
 }
 
 double? _toDouble(dynamic value) {

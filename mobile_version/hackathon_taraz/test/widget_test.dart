@@ -19,9 +19,11 @@ void main() {
     await tester.pumpWidget(
       const ProviderScope(child: AlatauPulseApp()),
     );
+    await tester.pumpAndSettle();
 
-    expect(find.text('Alatau Pulse'), findsOneWidget);
+    expect(find.text('Sign in'), findsOneWidget);
     expect(find.text('Sign In'), findsWidgets);
     expect(find.text('Register'), findsOneWidget);
+    expect(find.text('What is already connected'), findsOneWidget);
   });
 }

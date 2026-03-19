@@ -6,16 +6,64 @@ import '../../core/models/app_models.dart';
 import '../../core/state/app_controller.dart';
 import '../../shared/widgets/pulse_ui.dart';
 
-class EmergencyQueuePage extends ConsumerWidget {
+class EmergencyQueuePage extends ConsumerStatefulWidget {
   const EmergencyQueuePage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<EmergencyQueuePage> createState() => _EmergencyQueuePageState();
+}
+
+class _EmergencyQueuePageState extends ConsumerState<EmergencyQueuePage> {
+  IncidentStatus? _statusFilter;
+  UrgencyLevel? _urgencyFilter;
+
+  @override
+  Widget build(BuildContext context) {
     final controller = ref.watch(appControllerProvider);
-    final queue = controller.emergencyQueue;
+    final queue = controller.emergencyQueue.where((incident) {
+      final matchesStatus =
+          _statusFilter == null || incident.status == _statusFilter;
+      final matchesUrgency =
+          _urgencyFilter == null || incident.urgency == _urgencyFilter;
+      return matchesStatus && matchesUrgency;
+    }).toList();
 
     return PulsePageScroll(
       children: [
+        PulseSectionCard(
+          title: 'Queue filters',
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              ChoiceChip(
+                selected: _statusFilter == null,
+                label: const Text('All statuses'),
+                onSelected: (_) => setState(() => _statusFilter = null),
+              ),
+              ...IncidentStatus.values.map(
+                (status) => ChoiceChip(
+                  selected: _statusFilter == status,
+                  label: Text(status.label),
+                  onSelected: (_) => setState(() => _statusFilter = status),
+                ),
+              ),
+              ChoiceChip(
+                selected: _urgencyFilter == null,
+                label: const Text('All urgency'),
+                onSelected: (_) => setState(() => _urgencyFilter = null),
+              ),
+              ...UrgencyLevel.values.map(
+                (urgency) => ChoiceChip(
+                  selected: _urgencyFilter == urgency,
+                  label: Text(urgency.label),
+                  onSelected: (_) => setState(() => _urgencyFilter = urgency),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
         if (queue.isEmpty)
           const PulseEmptyState(
             title: 'Queue clear',
@@ -33,103 +81,85 @@ class EmergencyQueuePage extends ConsumerWidget {
 
             return Padding(
               padding: const EdgeInsets.only(bottom: 12),
-              child: PulseSectionCard(
-                title: incident.title,
-                subtitle: '${incident.district} • ${incident.createdAtLabel}',
-                trailing: StatusBadge(
-                  label: incident.status.label,
-                  backgroundColor: _incidentTone(
-                    incident.status,
-                  ).withValues(alpha: 0.12),
-                  foregroundColor: _incidentTone(incident.status),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        PulseTag(
-                          incident.urgency.label,
-                          icon: Icons.priority_high_outlined,
-                          backgroundColor: AppConstants.accent2Color.withValues(
-                            alpha: 0.10,
-                          ),
-                          foregroundColor: AppConstants.accent2Color,
-                        ),
-                        PulseTag(
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(28),
+                  onTap: () => showModalBottomSheet<void>(
+                    context: context,
+                    isScrollControlled: true,
+                    builder: (context) => _IncidentDetailSheet(
+                      incident: incident,
+                      organizationName:
                           organization?.name ?? 'Unassigned service',
-                          icon: Icons.business_outlined,
-                        ),
-                      ],
                     ),
-                    const SizedBox(height: 16),
-                    PulseInfoRow(
-                      icon: Icons.person_outline,
-                      label: 'Reporter',
-                      value: incident.reporterName,
-                      accentColor: AppConstants.mainAccentColor,
+                  ),
+                  child: PulseSectionCard(
+                    title: incident.title,
+                    subtitle: '${incident.district} • ${incident.createdAtLabel}',
+                    trailing: StatusBadge(
+                      label: incident.status.label,
+                      backgroundColor: _incidentTone(
+                        incident.status,
+                      ).withValues(alpha: 0.12),
+                      foregroundColor: _incidentTone(incident.status),
                     ),
-                    const SizedBox(height: 12),
-                    PulseInfoRow(
-                      icon: Icons.call_outlined,
-                      label: 'Contact',
-                      value: incident.reporterPhone.isEmpty
-                          ? 'Phone number not provided yet'
-                          : incident.reporterPhone,
-                      accentColor: AppConstants.secondaryAccentColor,
-                    ),
-                    const SizedBox(height: 16),
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        FilledButton.tonalIcon(
-                          onPressed: () async {
-                            await ref
-                                .read(appControllerProvider)
-                                .progressIncident(incident.id);
-                          },
-                          icon: const Icon(Icons.timeline_outlined),
-                          label: Text(_progressLabel(incident.status)),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            PulseTag(
+                              incident.urgency.label,
+                              icon: Icons.priority_high_outlined,
+                              backgroundColor: AppConstants.accent2Color
+                                  .withValues(alpha: 0.10),
+                              foregroundColor: AppConstants.accent2Color,
+                            ),
+                            PulseTag(
+                              organization?.name ?? 'Unassigned service',
+                              icon: Icons.business_outlined,
+                            ),
+                          ],
                         ),
-                        OutlinedButton.icon(
-                          onPressed: () async {
-                            await ref
-                                .read(appControllerProvider)
-                                .transferIncident(incident.id);
-                          },
-                          icon: const Icon(Icons.swap_horiz),
-                          label: const Text('Transfer'),
+                        const SizedBox(height: 16),
+                        PulseInfoRow(
+                          icon: Icons.person_outline,
+                          label: 'Reporter',
+                          value: incident.reporterName,
+                          accentColor: AppConstants.mainAccentColor,
                         ),
-                        TextButton.icon(
-                          onPressed: () {
-                            showDialog<void>(
-                              context: context,
-                              builder: (context) => AlertDialog(
-                                title: const Text('Contact reporter'),
-                                content: Text(
-                                  incident.reporterPhone.isEmpty
-                                      ? 'No phone number is stored for ${incident.reporterName} yet.'
-                                      : 'Call ${incident.reporterName} at ${incident.reporterPhone} to confirm details and accessibility needs.',
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.of(context).pop(),
-                                    child: const Text('Close'),
+                        const SizedBox(height: 12),
+                        PulseInfoRow(
+                          icon: Icons.call_outlined,
+                          label: 'Contact',
+                          value: incident.reporterPhone.isEmpty
+                              ? 'Phone number not provided yet'
+                              : incident.reporterPhone,
+                          accentColor: AppConstants.secondaryAccentColor,
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Text(
+                              'Open incident details',
+                              style: Theme.of(context).textTheme.labelLarge
+                                  ?.copyWith(
+                                    color: AppConstants.mainAccentColor,
                                   ),
-                                ],
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.call_outlined),
-                          label: const Text('Contact'),
+                            ),
+                            const Spacer(),
+                            const Icon(
+                              Icons.arrow_forward_rounded,
+                              color: AppConstants.mainAccentColor,
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             );
@@ -206,6 +236,147 @@ class EmergencyReportsPage extends ConsumerWidget {
             );
           }),
       ],
+    );
+  }
+}
+
+class _IncidentDetailSheet extends ConsumerWidget {
+  const _IncidentDetailSheet({
+    required this.incident,
+    required this.organizationName,
+  });
+
+  final Incident incident;
+  final String organizationName;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final controller = ref.watch(appControllerProvider);
+    final relatedReport = controller.reports
+        .where((report) => report.id == incident.relatedReportId)
+        .firstOrNull;
+
+    Future<void> runAction(Future<ActionResult> Function() action) async {
+      final result = await action();
+      if (context.mounted) {
+        showActionResultSnackBar(context, result);
+        if (result.success) {
+          Navigator.of(context).pop();
+        }
+      }
+    }
+
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              incident.title,
+              style: Theme.of(
+                context,
+              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 20),
+            PulseInfoRow(
+              icon: Icons.flag_outlined,
+              label: 'Current status',
+              value: incident.status.label,
+              accentColor: _incidentTone(incident.status),
+            ),
+            const SizedBox(height: 14),
+            PulseInfoRow(
+              icon: Icons.location_on_outlined,
+              label: 'District / location',
+              value:
+                  '${incident.district}${relatedReport == null ? '' : ' • ${relatedReport.location}'}',
+              accentColor: AppConstants.secondaryAccentColor,
+            ),
+            const SizedBox(height: 14),
+            PulseInfoRow(
+              icon: Icons.business_outlined,
+              label: 'Assigned service',
+              value: organizationName,
+              accentColor: AppConstants.mainAccentColor,
+            ),
+            const SizedBox(height: 14),
+            PulseInfoRow(
+              icon: Icons.person_outline,
+              label: 'Reporter',
+              value: incident.reporterName,
+              accentColor: AppConstants.mainAccentColor,
+            ),
+            const SizedBox(height: 14),
+            PulseInfoRow(
+              icon: Icons.call_outlined,
+              label: 'Contact',
+              value: incident.reporterPhone.isEmpty
+                  ? 'Phone number not provided yet'
+                  : incident.reporterPhone,
+              accentColor: AppConstants.secondaryAccentColor,
+            ),
+            if (relatedReport != null) ...[
+              const SizedBox(height: 20),
+              PulseSectionCard(
+                title: 'Related resident report',
+                subtitle:
+                    '${relatedReport.category} • ${relatedReport.status.label}',
+                child: Text(relatedReport.description),
+              ),
+            ],
+            const SizedBox(height: 20),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                FilledButton.tonalIcon(
+                  onPressed: controller.isBusy
+                      ? null
+                      : () => runAction(
+                            () => ref
+                                .read(appControllerProvider)
+                                .progressIncident(incident.id),
+                          ),
+                  icon: const Icon(Icons.timeline_outlined),
+                  label: Text(_progressLabel(incident.status)),
+                ),
+                OutlinedButton.icon(
+                  onPressed: controller.isBusy
+                      ? null
+                      : () => runAction(
+                            () => ref
+                                .read(appControllerProvider)
+                                .transferIncident(incident.id),
+                          ),
+                  icon: const Icon(Icons.swap_horiz),
+                  label: const Text('Transfer'),
+                ),
+                FilledButton.tonalIcon(
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Route-to-incident is mocked in this MVP.'),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.route_outlined),
+                  label: const Text('Route to incident'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const PulseSectionCard(
+              title: 'Reporter communication',
+              subtitle:
+                  'Phone contact is available in this MVP. Chat and request-details stay mocked.',
+              child: Text(
+                'Use the stored phone number to confirm details, accessibility needs, or exact access constraints before arrival.',
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

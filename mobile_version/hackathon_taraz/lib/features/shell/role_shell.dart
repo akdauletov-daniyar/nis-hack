@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/constants/app_constants.dart';
 import '../../core/models/app_models.dart';
 import '../../core/state/app_controller.dart';
 import '../../shared/widgets/pulse_ui.dart';
@@ -9,6 +10,7 @@ import '../emergency/emergency_pages.dart';
 import '../government/government_pages.dart';
 import '../home/home_pages.dart';
 import '../map/map_pages.dart';
+import '../notifications/notifications_page.dart';
 import '../profile/profile_page.dart';
 import '../reporting/report_pages.dart';
 
@@ -77,19 +79,14 @@ class _RoleShellState extends ConsumerState<RoleShell> {
         ),
       ),
       floatingActionButton: _showsSos(widget.role)
-          ? FloatingActionButton.extended(
+          ? FloatingActionButton(
               onPressed: () async {
-                await ref.read(appControllerProvider).triggerSos();
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('SOS dispatched to emergency queue'),
-                    ),
-                  );
+                final result = await _showSosDialog(context, ref);
+                if (context.mounted && result != null) {
+                  showActionResultSnackBar(context, result);
                 }
               },
-              icon: const Icon(Icons.sos),
-              label: const Text(''),
+              child: const Icon(Icons.sos),
             )
           : null,
       bottomNavigationBar: SafeArea(
@@ -128,88 +125,138 @@ class _RoleShellState extends ConsumerState<RoleShell> {
 }
 
 void _showNotifications(BuildContext context, WidgetRef ref) {
-  final controller = ref.read(appControllerProvider);
+  Navigator.of(
+    context,
+  ).push(MaterialPageRoute(builder: (_) => const NotificationsPage()));
+}
 
-  showModalBottomSheet<void>(
+Future<ActionResult?> _showSosDialog(BuildContext context, WidgetRef ref) {
+  final districtOptions = AppConstants.districts;
+  final currentDistrict =
+      ref.read(appControllerProvider).currentUser?.district ??
+      AppConstants.defaultDistrict;
+  final locationController = TextEditingController(
+    text: 'Near $currentDistrict mobile user location',
+  );
+  final formKey = GlobalKey<FormState>();
+  SosType selectedType = SosType.medical;
+  String selectedDistrict = currentDistrict;
+
+  return showDialog<ActionResult>(
     context: context,
-    isScrollControlled: true,
-    builder: (context) {
-      return SafeArea(
-        child: SizedBox(
-          height: MediaQuery.sizeOf(context).height * 0.85,
-          child: PulsePageScroll(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
-            children: [
-              Text(
-                'Notifications',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Unread updates, alerts, and workflow changes from across the city.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 20),
-              if (controller.notifications.isEmpty)
-                const PulseEmptyState(
-                  title: 'Nothing new right now',
-                  message:
-                      'Activity updates will appear here as the app fills with live data.',
-                  icon: Icons.notifications_off_outlined,
-                ),
-              ...controller.notifications.map((notification) {
-                final isUnread = !notification.read;
+    builder: (dialogContext) {
+      return StatefulBuilder(
+        builder: (context, setState) {
+          final controller = ref.watch(appControllerProvider);
 
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: PulseSectionCard(
-                    title: notification.title,
-                    subtitle: notification.createdAtLabel,
-                    trailing: StatusBadge(
-                      label: isUnread ? 'Unread' : 'Seen',
-                      backgroundColor: isUnread
-                          ? Theme.of(context).colorScheme.primaryContainer
-                                .withValues(alpha: 0.9)
-                          : Theme.of(context).colorScheme.surfaceContainerHigh,
-                      foregroundColor: isUnread
-                          ? Theme.of(context).colorScheme.primary
-                          : Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(notification.body),
-                        if (isUnread) ...[
-                          const SizedBox(height: 14),
-                          FilledButton.tonalIcon(
-                            onPressed: () async {
-                              await ref
-                                  .read(appControllerProvider)
-                                  .markNotificationRead(notification.id);
-                              if (context.mounted) {
-                                Navigator.of(context).pop();
-                                _showNotifications(context, ref);
-                              }
-                            },
-                            icon: const Icon(Icons.mark_email_read_outlined),
-                            label: const Text('Mark as read'),
+          return AlertDialog(
+            title: const Text('Confirm SOS'),
+            content: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  PulseDropdownField<SosType>(
+                    label: 'Emergency type',
+                    value: selectedType,
+                    options: SosType.values
+                        .map(
+                          (type) => PulseDropdownOption(
+                            value: type,
+                            label: type.label,
+                            icon: Icons.sos_outlined,
                           ),
-                        ],
-                      ],
-                    ),
+                        )
+                        .toList(),
+                    onChanged: controller.isBusy
+                        ? null
+                        : (value) {
+                            if (value != null) {
+                              setState(() => selectedType = value);
+                            }
+                          },
                   ),
-                );
-              }),
+                  const SizedBox(height: 12),
+                  PulseDropdownField<String>(
+                    label: 'District',
+                    value: selectedDistrict,
+                    options: districtOptions
+                        .map(
+                          (district) => PulseDropdownOption(
+                            value: district,
+                            label: district,
+                            icon: Icons.location_on_outlined,
+                          ),
+                        )
+                        .toList(),
+                    onChanged: controller.isBusy
+                        ? null
+                        : (value) {
+                            if (value != null) {
+                              setState(() => selectedDistrict = value);
+                            }
+                          },
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: locationController,
+                    enabled: !controller.isBusy,
+                    maxLines: 2,
+                    decoration: const InputDecoration(
+                      labelText: 'Location details',
+                      hintText: 'Describe where emergency services should go.',
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().length < 6) {
+                        return 'Add a clear location for the dispatch team.';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: controller.isBusy
+                    ? null
+                    : () => Navigator.of(dialogContext).pop(),
+                child: const Text('Cancel'),
+              ),
+              FilledButton.icon(
+                onPressed: controller.isBusy
+                    ? null
+                    : () async {
+                        if (!formKey.currentState!.validate()) {
+                          return;
+                        }
+
+                        final result = await ref
+                            .read(appControllerProvider)
+                            .triggerSos(
+                              sosType: selectedType,
+                              district: selectedDistrict,
+                              locationDetails: locationController.text.trim(),
+                            );
+
+                        if (dialogContext.mounted) {
+                          Navigator.of(dialogContext).pop(result);
+                        }
+                      },
+                icon: controller.isBusy
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.sos),
+                label: const Text('Dispatch SOS'),
+              ),
             ],
-          ),
-        ),
+          );
+        },
       );
     },
-  );
+  ).whenComplete(locationController.dispose);
 }
 
 bool _showsSos(UserRole role) {

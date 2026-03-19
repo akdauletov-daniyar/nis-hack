@@ -45,6 +45,8 @@ class AuthPage extends ConsumerStatefulWidget {
 }
 
 class _AuthPageState extends ConsumerState<AuthPage> {
+  final _signInFormKey = GlobalKey<FormState>();
+  final _registerFormKey = GlobalKey<FormState>();
   final _signInEmailController = TextEditingController();
   final _signInPasswordController = TextEditingController();
   final _nameController = TextEditingController();
@@ -118,6 +120,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
             ),
           if (_isRegisterMode)
             _RegisterForm(
+              formKey: _registerFormKey,
               isBusy: controller.isBusy,
               nameController: _nameController,
               phoneController: _phoneController,
@@ -130,12 +133,15 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                 }
               },
               onSubmit: () async {
+                if (!_registerFormKey.currentState!.validate()) {
+                  return;
+                }
                 await ref
                     .read(appControllerProvider)
                     .registerWithEmail(
-                      fullName: _nameController.text,
-                      phone: _phoneController.text,
-                      email: _registerEmailController.text,
+                      fullName: _nameController.text.trim(),
+                      phone: _phoneController.text.trim(),
+                      email: _registerEmailController.text.trim(),
                       password: _registerPasswordController.text,
                       district: _selectedDistrict,
                     );
@@ -143,14 +149,18 @@ class _AuthPageState extends ConsumerState<AuthPage> {
             )
           else
             _SignInForm(
+              formKey: _signInFormKey,
               isBusy: controller.isBusy,
               emailController: _signInEmailController,
               passwordController: _signInPasswordController,
               onSubmit: () async {
+                if (!_signInFormKey.currentState!.validate()) {
+                  return;
+                }
                 await ref
                     .read(appControllerProvider)
                     .signInWithEmail(
-                      email: _signInEmailController.text,
+                      email: _signInEmailController.text.trim(),
                       password: _signInPasswordController.text,
                     );
               },
@@ -220,12 +230,14 @@ class _AuthPageState extends ConsumerState<AuthPage> {
 
 class _SignInForm extends StatelessWidget {
   const _SignInForm({
+    required this.formKey,
     required this.isBusy,
     required this.emailController,
     required this.passwordController,
     required this.onSubmit,
   });
 
+  final GlobalKey<FormState> formKey;
   final bool isBusy;
   final TextEditingController emailController;
   final TextEditingController passwordController;
@@ -233,44 +245,68 @@ class _SignInForm extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        TextField(
-          controller: emailController,
-          keyboardType: TextInputType.emailAddress,
-          decoration: const InputDecoration(
-            labelText: 'Email',
-            prefixIcon: Icon(Icons.email_outlined),
+    return Form(
+      key: formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextFormField(
+            controller: emailController,
+            enabled: !isBusy,
+            keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(
+              labelText: 'Email',
+              prefixIcon: Icon(Icons.email_outlined),
+            ),
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Enter your email address.';
+              }
+              if (!value.contains('@') || !value.contains('.')) {
+                return 'Enter a valid email address.';
+              }
+              return null;
+            },
           ),
-        ),
-        const SizedBox(height: 16),
-        TextField(
-          controller: passwordController,
-          obscureText: true,
-          decoration: const InputDecoration(
-            labelText: 'Password',
-            prefixIcon: Icon(Icons.lock_outline),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: passwordController,
+            enabled: !isBusy,
+            obscureText: true,
+            decoration: const InputDecoration(
+              labelText: 'Password',
+              prefixIcon: Icon(Icons.lock_outline),
+            ),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Enter your password.';
+              }
+              if (value.length < 6) {
+                return 'Password must be at least 6 characters.';
+              }
+              return null;
+            },
           ),
-        ),
-        const SizedBox(height: 20),
-        FilledButton.icon(
-          onPressed: isBusy ? null : onSubmit,
-          icon: isBusy
-              ? const SizedBox.square(
-                  dimension: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.login),
-          label: const Text('Sign In'),
-        ),
-      ],
+          const SizedBox(height: 20),
+          FilledButton.icon(
+            onPressed: isBusy ? null : onSubmit,
+            icon: isBusy
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.login),
+            label: const Text('Sign In'),
+          ),
+        ],
+      ),
     );
   }
 }
 
 class _RegisterForm extends StatelessWidget {
   const _RegisterForm({
+    required this.formKey,
     required this.isBusy,
     required this.nameController,
     required this.phoneController,
@@ -281,6 +317,7 @@ class _RegisterForm extends StatelessWidget {
     required this.onSubmit,
   });
 
+  final GlobalKey<FormState> formKey;
   final bool isBusy;
   final TextEditingController nameController;
   final TextEditingController phoneController;
@@ -292,72 +329,109 @@ class _RegisterForm extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        TextField(
-          controller: nameController,
-          decoration: const InputDecoration(
-            labelText: 'Full name',
-            prefixIcon: Icon(Icons.person_outline),
+    return Form(
+      key: formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextFormField(
+            controller: nameController,
+            enabled: !isBusy,
+            decoration: const InputDecoration(
+              labelText: 'Full name',
+              prefixIcon: Icon(Icons.person_outline),
+            ),
+            validator: (value) {
+              if (value == null || value.trim().length < 2) {
+                return 'Enter your full name.';
+              }
+              return null;
+            },
           ),
-        ),
-        const SizedBox(height: 16),
-        TextField(
-          controller: phoneController,
-          keyboardType: TextInputType.phone,
-          decoration: const InputDecoration(
-            labelText: 'Phone number',
-            prefixIcon: Icon(Icons.phone_outlined),
-            hintText: '+7 700 123 4567',
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: phoneController,
+            enabled: !isBusy,
+            keyboardType: TextInputType.phone,
+            decoration: const InputDecoration(
+              labelText: 'Phone number',
+              prefixIcon: Icon(Icons.phone_outlined),
+              hintText: '+7 700 123 4567',
+            ),
+            validator: (value) {
+              if (value == null || value.trim().length < 6) {
+                return 'Enter a phone number.';
+              }
+              return null;
+            },
           ),
-        ),
-        const SizedBox(height: 16),
-        TextField(
-          controller: emailController,
-          keyboardType: TextInputType.emailAddress,
-          decoration: const InputDecoration(
-            labelText: 'Email',
-            prefixIcon: Icon(Icons.email_outlined),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: emailController,
+            enabled: !isBusy,
+            keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(
+              labelText: 'Email',
+              prefixIcon: Icon(Icons.email_outlined),
+            ),
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Enter your email address.';
+              }
+              if (!value.contains('@') || !value.contains('.')) {
+                return 'Enter a valid email address.';
+              }
+              return null;
+            },
           ),
-        ),
-        const SizedBox(height: 16),
-        TextField(
-          controller: passwordController,
-          obscureText: true,
-          decoration: const InputDecoration(
-            labelText: 'Password',
-            prefixIcon: Icon(Icons.lock_outline),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: passwordController,
+            enabled: !isBusy,
+            obscureText: true,
+            decoration: const InputDecoration(
+              labelText: 'Password',
+              prefixIcon: Icon(Icons.lock_outline),
+            ),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Enter a password.';
+              }
+              if (value.length < 6) {
+                return 'Password must be at least 6 characters.';
+              }
+              return null;
+            },
           ),
-        ),
-        const SizedBox(height: 16),
-        PulseDropdownField<String>(
-          label: 'District',
-          prefixIcon: Icons.location_city_outlined,
-          value: selectedDistrict,
-          options: AppConstants.districts
-              .map(
-                (district) => PulseDropdownOption(
-                  value: district,
-                  label: district,
-                  icon: Icons.location_on_outlined,
-                ),
-              )
-              .toList(),
-          onChanged: onDistrictChanged,
-        ),
-        const SizedBox(height: 20),
-        FilledButton.icon(
-          onPressed: isBusy ? null : onSubmit,
-          icon: isBusy
-              ? const SizedBox.square(
-                  dimension: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+          const SizedBox(height: 16),
+          PulseDropdownField<String>(
+            label: 'District',
+            prefixIcon: Icons.location_city_outlined,
+            value: selectedDistrict,
+            options: AppConstants.districts
+                .map(
+                  (district) => PulseDropdownOption(
+                    value: district,
+                    label: district,
+                    icon: Icons.location_on_outlined,
+                  ),
                 )
-              : const Icon(Icons.person_add_alt_1),
-          label: const Text('Create Account'),
-        ),
-      ],
+                .toList(),
+            onChanged: isBusy ? null : onDistrictChanged,
+          ),
+          const SizedBox(height: 20),
+          FilledButton.icon(
+            onPressed: isBusy ? null : onSubmit,
+            icon: isBusy
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.person_add_alt_1),
+            label: const Text('Create Account'),
+          ),
+        ],
+      ),
     );
   }
 }
