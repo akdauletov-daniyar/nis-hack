@@ -687,7 +687,9 @@ class AppController extends ChangeNotifier {
         _asMapList(await _client.from('profiles').select().eq('id', userId));
     if (profileRows.isEmpty) {
       throw StateError(
-        'Profile data is missing. Run the SQL setup in supabase/schema.sql.',
+        'Profile data is missing for this account. '
+        'If the database was created from an older schema, rerun the updated '
+        'supabase/schema.sql and sign in again.',
       );
     }
 
@@ -822,7 +824,11 @@ class AppController extends ChangeNotifier {
         'mobility_type':
             authUser.userMetadata?['mobility_type'] as String? ?? 'general',
       }, onConflict: 'id');
-    } catch (_) {
+    } on PostgrestException catch (error) {
+      if (_hasLegacyProfilesSchema(error.message)) {
+        rethrow;
+      }
+
       // If a trigger already created the profile or RLS blocks a duplicate write,
       // we continue and load the existing row.
     }
@@ -951,12 +957,24 @@ class AppController extends ChangeNotifier {
     }
     if (error is PostgrestException) {
       final message = error.message;
+      if (_hasLegacyProfilesSchema(message)) {
+        return 'The connected Supabase project has an older profiles table. '
+            'Rerun the updated supabase/schema.sql to add the missing columns.';
+      }
       if (message.contains('relation') && message.contains('does not exist')) {
         return 'Supabase tables are not installed yet. Run supabase/schema.sql in the SQL Editor.';
       }
       return message;
     }
     return error.toString();
+  }
+
+  bool _hasLegacyProfilesSchema(String message) {
+    final normalized = message.toLowerCase();
+    return normalized.contains('profiles') &&
+        (normalized.contains('schema cache') ||
+            normalized.contains('column') && normalized.contains('does not exist') ||
+            normalized.contains('record') && normalized.contains('has no field'));
   }
 }
 

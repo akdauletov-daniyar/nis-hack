@@ -51,13 +51,6 @@ class CityMapPage extends ConsumerWidget {
                       incidents: controller.incidents,
                     ),
                     circles: _buildCircles(controller.incidents),
-                    polylines: _buildPolylines(
-                      barrierFreeMode: controller.barrierFreeMode,
-                      mobilityType:
-                          controller.currentUser?.profile.mobilityType ??
-                              MobilityType.general,
-                      color: theme.colorScheme.primary,
-                    ),
                     gestureRecognizers: {
                       Factory<OneSequenceGestureRecognizer>(
                         EagerGestureRecognizer.new,
@@ -74,7 +67,6 @@ class CityMapPage extends ConsumerWidget {
                   const Chip(label: Text('Citizen reports')),
                   const Chip(label: Text('Active incidents')),
                   const Chip(label: Text('Accessibility barriers')),
-                  const Chip(label: Text('Route overlay')),
                   if (role == UserRole.government)
                     const Chip(label: Text('Government review scope')),
                   if (role == UserRole.emergencyService)
@@ -247,44 +239,6 @@ Set<Circle> _buildCircles(List<Incident> incidents) {
         ),
       )
       .toSet();
-}
-
-Set<Polyline> _buildPolylines({
-  required bool barrierFreeMode,
-  required MobilityType mobilityType,
-  required Color color,
-}) {
-  final barrierFreeRoute = <LatLng>[
-    const LatLng(43.2371, 76.8819),
-    const LatLng(43.2393, 76.8840),
-    const LatLng(43.2410, 76.8872),
-    const LatLng(43.2404, 76.8859),
-  ];
-
-  final fastRoute = <LatLng>[
-    const LatLng(43.2371, 76.8819),
-    const LatLng(43.2381, 76.8862),
-    const LatLng(43.2390, 76.8890),
-    const LatLng(43.2404, 76.8859),
-  ];
-
-  final route = barrierFreeMode ? barrierFreeRoute : fastRoute;
-  final routeColor = barrierFreeMode ? color : const Color(0xFFF59E0B);
-
-  return {
-    Polyline(
-      polylineId: const PolylineId('route'),
-      points: route,
-      width: mobilityType == MobilityType.wheelchair ? 7 : 6,
-      color: routeColor,
-      patterns: barrierFreeMode
-          ? []
-          : [
-              PatternItem.dash(24),
-              PatternItem.gap(12),
-            ],
-    ),
-  };
 }
 
 class _LineItem extends StatelessWidget {

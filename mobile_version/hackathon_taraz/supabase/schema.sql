@@ -21,6 +21,68 @@ create table if not exists public.profiles (
   created_at timestamptz not null default now()
 );
 
+alter table public.profiles
+  add column if not exists email text default '';
+
+alter table public.profiles
+  add column if not exists full_name text default '';
+
+alter table public.profiles
+  add column if not exists phone text default '';
+
+alter table public.profiles
+  add column if not exists district text default 'Alatau Central';
+
+alter table public.profiles
+  add column if not exists mobility_type text default 'general';
+
+alter table public.profiles
+  add column if not exists avoid_stairs boolean default true;
+
+alter table public.profiles
+  add column if not exists avoid_steep_slopes boolean default true;
+
+alter table public.profiles
+  add column if not exists avoid_broken_elevators boolean default true;
+
+update public.profiles
+set
+  email = coalesce(email, ''),
+  full_name = coalesce(full_name, ''),
+  phone = coalesce(phone, ''),
+  district = coalesce(district, 'Alatau Central'),
+  mobility_type = coalesce(mobility_type, 'general'),
+  avoid_stairs = coalesce(avoid_stairs, true),
+  avoid_steep_slopes = coalesce(avoid_steep_slopes, true),
+  avoid_broken_elevators = coalesce(avoid_broken_elevators, true)
+where
+  email is null
+  or full_name is null
+  or phone is null
+  or district is null
+  or mobility_type is null
+  or avoid_stairs is null
+  or avoid_steep_slopes is null
+  or avoid_broken_elevators is null;
+
+alter table public.profiles
+  alter column email set default '',
+  alter column email set not null,
+  alter column full_name set default '',
+  alter column full_name set not null,
+  alter column phone set default '',
+  alter column phone set not null,
+  alter column district set default 'Alatau Central',
+  alter column district set not null,
+  alter column mobility_type set default 'general',
+  alter column mobility_type set not null,
+  alter column avoid_stairs set default true,
+  alter column avoid_stairs set not null,
+  alter column avoid_steep_slopes set default true,
+  alter column avoid_steep_slopes set not null,
+  alter column avoid_broken_elevators set default true,
+  alter column avoid_broken_elevators set not null;
+
 create table if not exists public.role_assignments (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.profiles(id) on delete cascade,
@@ -31,6 +93,20 @@ create table if not exists public.role_assignments (
   granted_at timestamptz not null default now(),
   unique (user_id, role)
 );
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.role_assignments'::regclass
+      and conname = 'role_assignments_user_id_role_key'
+  ) then
+    alter table public.role_assignments
+      add constraint role_assignments_user_id_role_key unique (user_id, role);
+  end if;
+end;
+$$;
 
 create table if not exists public.saved_places (
   id uuid primary key default gen_random_uuid(),
@@ -121,6 +197,35 @@ set
   name = excluded.name,
   type = excluded.type,
   districts = excluded.districts;
+
+insert into public.profiles (
+  id,
+  email,
+  full_name,
+  phone,
+  district,
+  mobility_type
+)
+select
+  users.id,
+  coalesce(users.email, ''),
+  coalesce(users.raw_user_meta_data->>'full_name', ''),
+  coalesce(users.raw_user_meta_data->>'phone', ''),
+  coalesce(users.raw_user_meta_data->>'district', 'Alatau Central'),
+  coalesce(users.raw_user_meta_data->>'mobility_type', 'general')
+from auth.users as users
+on conflict (id) do update
+set
+  email = excluded.email,
+  full_name = excluded.full_name,
+  phone = excluded.phone,
+  district = excluded.district,
+  mobility_type = excluded.mobility_type;
+
+insert into public.role_assignments (user_id, role, active)
+select profiles.id, 'resident', true
+from public.profiles as profiles
+on conflict (user_id, role) do nothing;
 
 create or replace function public.current_user_has_role(target_role text)
 returns boolean
@@ -220,6 +325,9 @@ using (public.current_user_has_role('admin'))
 with check (public.current_user_has_role('admin'));
 
 drop policy if exists "profiles self read or admin" on public.profiles;
+drop policy if exists "Public profiles are viewable by everyone." on public.profiles;
+drop policy if exists "Users can insert their own profile." on public.profiles;
+drop policy if exists "Users can update own profile." on public.profiles;
 create policy "profiles self read or admin"
 on public.profiles for select
 to authenticated
