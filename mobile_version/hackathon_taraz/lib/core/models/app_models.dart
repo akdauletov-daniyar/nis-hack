@@ -2,36 +2,36 @@ enum UserRole { resident, emergencyService, government, admin }
 
 extension UserRoleX on UserRole {
   String get label => switch (this) {
-        UserRole.resident => 'Resident',
-        UserRole.emergencyService => 'Emergency Service',
-        UserRole.government => 'Government / Akimat',
-        UserRole.admin => 'Admin',
-      };
+    UserRole.resident => 'Resident',
+    UserRole.emergencyService => 'Emergency Service',
+    UserRole.government => 'Government / Akimat',
+    UserRole.admin => 'Admin',
+  };
 
   String get shortLabel => switch (this) {
-        UserRole.resident => 'Resident',
-        UserRole.emergencyService => 'Emergency',
-        UserRole.government => 'Government',
-        UserRole.admin => 'Admin',
-      };
+    UserRole.resident => 'Resident',
+    UserRole.emergencyService => 'Emergency',
+    UserRole.government => 'Government',
+    UserRole.admin => 'Admin',
+  };
 
   String get description => switch (this) {
-        UserRole.resident =>
-          'Report problems, track safety, use barrier-free routing.',
-        UserRole.emergencyService =>
-          'Manage urgent incidents, field response, and responder status.',
-        UserRole.government =>
-          'Review city issues, assign services, and publish alerts.',
-        UserRole.admin =>
-          'Manage users, organizations, moderation, and categories.',
-      };
+    UserRole.resident =>
+      'Report problems, track safety, use barrier-free routing.',
+    UserRole.emergencyService =>
+      'Manage urgent incidents, field response, and responder status.',
+    UserRole.government =>
+      'Review city issues, assign services, and publish alerts.',
+    UserRole.admin =>
+      'Manage users, organizations, moderation, and categories.',
+  };
 
   String get dbValue => switch (this) {
-        UserRole.resident => 'resident',
-        UserRole.emergencyService => 'emergency_service',
-        UserRole.government => 'government',
-        UserRole.admin => 'admin',
-      };
+    UserRole.resident => 'resident',
+    UserRole.emergencyService => 'emergency_service',
+    UserRole.government => 'government',
+    UserRole.admin => 'admin',
+  };
 }
 
 UserRole userRoleFromDb(String? value) {
@@ -48,10 +48,10 @@ enum OrganizationType { emergency, government, admin }
 
 extension OrganizationTypeX on OrganizationType {
   String get dbValue => switch (this) {
-        OrganizationType.emergency => 'emergency',
-        OrganizationType.government => 'government',
-        OrganizationType.admin => 'admin',
-      };
+    OrganizationType.emergency => 'emergency',
+    OrganizationType.government => 'government',
+    OrganizationType.admin => 'admin',
+  };
 }
 
 OrganizationType organizationTypeFromDb(String? value) {
@@ -67,20 +67,20 @@ enum MobilityType { wheelchair, lowVision, elderly, stroller, general }
 
 extension MobilityTypeX on MobilityType {
   String get label => switch (this) {
-        MobilityType.wheelchair => 'Wheelchair',
-        MobilityType.lowVision => 'Low vision',
-        MobilityType.elderly => 'Elderly',
-        MobilityType.stroller => 'Stroller',
-        MobilityType.general => 'General',
-      };
+    MobilityType.wheelchair => 'Wheelchair',
+    MobilityType.lowVision => 'Low vision',
+    MobilityType.elderly => 'Elderly',
+    MobilityType.stroller => 'Stroller',
+    MobilityType.general => 'General',
+  };
 
   String get dbValue => switch (this) {
-        MobilityType.wheelchair => 'wheelchair',
-        MobilityType.lowVision => 'low_vision',
-        MobilityType.elderly => 'elderly',
-        MobilityType.stroller => 'stroller',
-        MobilityType.general => 'general',
-      };
+    MobilityType.wheelchair => 'wheelchair',
+    MobilityType.lowVision => 'low_vision',
+    MobilityType.elderly => 'elderly',
+    MobilityType.stroller => 'stroller',
+    MobilityType.general => 'general',
+  };
 }
 
 MobilityType mobilityTypeFromDb(String? value) {
@@ -98,11 +98,11 @@ enum UrgencyLevel { low, medium, high, critical }
 
 extension UrgencyLevelX on UrgencyLevel {
   String get label => switch (this) {
-        UrgencyLevel.low => 'Low',
-        UrgencyLevel.medium => 'Medium',
-        UrgencyLevel.high => 'High',
-        UrgencyLevel.critical => 'Critical',
-      };
+    UrgencyLevel.low => 'Low',
+    UrgencyLevel.medium => 'Medium',
+    UrgencyLevel.high => 'High',
+    UrgencyLevel.critical => 'Critical',
+  };
 
   String get dbValue => name;
 }
@@ -133,32 +133,32 @@ enum ReportStatus {
 
 extension ReportStatusX on ReportStatus {
   String get label => switch (this) {
-        ReportStatus.draft => 'Draft',
-        ReportStatus.submitted => 'Submitted',
-        ReportStatus.underReview => 'Under review',
-        ReportStatus.validated => 'Validated',
-        ReportStatus.assigned => 'Assigned',
-        ReportStatus.inProgress => 'In progress',
-        ReportStatus.resolved => 'Resolved',
-        ReportStatus.closed => 'Closed',
-        ReportStatus.rejected => 'Rejected',
-        ReportStatus.duplicate => 'Duplicate',
-        ReportStatus.spam => 'Spam',
-      };
+    ReportStatus.draft => 'Draft',
+    ReportStatus.submitted => 'Submitted',
+    ReportStatus.underReview => 'Under review',
+    ReportStatus.validated => 'Validated',
+    ReportStatus.assigned => 'Assigned',
+    ReportStatus.inProgress => 'In progress',
+    ReportStatus.resolved => 'Resolved',
+    ReportStatus.closed => 'Closed',
+    ReportStatus.rejected => 'Rejected',
+    ReportStatus.duplicate => 'Duplicate',
+    ReportStatus.spam => 'Spam',
+  };
 
   String get dbValue => switch (this) {
-        ReportStatus.draft => 'draft',
-        ReportStatus.submitted => 'submitted',
-        ReportStatus.underReview => 'under_review',
-        ReportStatus.validated => 'validated',
-        ReportStatus.assigned => 'assigned',
-        ReportStatus.inProgress => 'in_progress',
-        ReportStatus.resolved => 'resolved',
-        ReportStatus.closed => 'closed',
-        ReportStatus.rejected => 'rejected',
-        ReportStatus.duplicate => 'duplicate',
-        ReportStatus.spam => 'spam',
-      };
+    ReportStatus.draft => 'draft',
+    ReportStatus.submitted => 'submitted',
+    ReportStatus.underReview => 'under_review',
+    ReportStatus.validated => 'validated',
+    ReportStatus.assigned => 'assigned',
+    ReportStatus.inProgress => 'in_progress',
+    ReportStatus.resolved => 'resolved',
+    ReportStatus.closed => 'closed',
+    ReportStatus.rejected => 'rejected',
+    ReportStatus.duplicate => 'duplicate',
+    ReportStatus.spam => 'spam',
+  };
 }
 
 ReportStatus reportStatusFromDb(String? value) {
@@ -190,24 +190,24 @@ enum IncidentStatus {
 
 extension IncidentStatusX on IncidentStatus {
   String get label => switch (this) {
-        IncidentStatus.newIncident => 'New',
-        IncidentStatus.assigned => 'Assigned',
-        IncidentStatus.crewEnRoute => 'Crew en route',
-        IncidentStatus.onSite => 'On site',
-        IncidentStatus.resolved => 'Resolved',
-        IncidentStatus.transferred => 'Transferred',
-        IncidentStatus.closed => 'Closed',
-      };
+    IncidentStatus.newIncident => 'New',
+    IncidentStatus.assigned => 'Assigned',
+    IncidentStatus.crewEnRoute => 'Crew en route',
+    IncidentStatus.onSite => 'On site',
+    IncidentStatus.resolved => 'Resolved',
+    IncidentStatus.transferred => 'Transferred',
+    IncidentStatus.closed => 'Closed',
+  };
 
   String get dbValue => switch (this) {
-        IncidentStatus.newIncident => 'new',
-        IncidentStatus.assigned => 'assigned',
-        IncidentStatus.crewEnRoute => 'crew_en_route',
-        IncidentStatus.onSite => 'on_site',
-        IncidentStatus.resolved => 'resolved',
-        IncidentStatus.transferred => 'transferred',
-        IncidentStatus.closed => 'closed',
-      };
+    IncidentStatus.newIncident => 'new',
+    IncidentStatus.assigned => 'assigned',
+    IncidentStatus.crewEnRoute => 'crew_en_route',
+    IncidentStatus.onSite => 'on_site',
+    IncidentStatus.resolved => 'resolved',
+    IncidentStatus.transferred => 'transferred',
+    IncidentStatus.closed => 'closed',
+  };
 }
 
 IncidentStatus incidentStatusFromDb(String? value) {
@@ -255,8 +255,7 @@ class AccessibilityProfile {
       mobilityType: mobilityType ?? this.mobilityType,
       avoidStairs: avoidStairs ?? this.avoidStairs,
       avoidSteepSlopes: avoidSteepSlopes ?? this.avoidSteepSlopes,
-      avoidBrokenElevators:
-          avoidBrokenElevators ?? this.avoidBrokenElevators,
+      avoidBrokenElevators: avoidBrokenElevators ?? this.avoidBrokenElevators,
     );
   }
 }
@@ -418,8 +417,7 @@ class CityReport {
       district: district ?? this.district,
       location: location ?? this.location,
       createdAtLabel: createdAtLabel ?? this.createdAtLabel,
-      accessibilityRelated:
-          accessibilityRelated ?? this.accessibilityRelated,
+      accessibilityRelated: accessibilityRelated ?? this.accessibilityRelated,
       assignedOrganizationId:
           assignedOrganizationId ?? this.assignedOrganizationId,
       photoLabel: photoLabel ?? this.photoLabel,
@@ -454,8 +452,7 @@ class Incident {
       district: map['district'] as String? ?? '',
       reporterName: map['reporter_name'] as String? ?? 'Resident',
       reporterPhone: map['reporter_phone'] as String? ?? '',
-      assignedOrganizationId:
-          map['assigned_organization_id']?.toString() ?? '',
+      assignedOrganizationId: map['assigned_organization_id']?.toString() ?? '',
       createdAtLabel: formatRelativeTime(map['created_at']),
       relatedReportId: map['report_id']?.toString(),
       latitude: _toDouble(map['latitude']),

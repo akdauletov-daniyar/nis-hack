@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/constants/app_constants.dart';
 import '../../core/models/app_models.dart';
 import '../../core/state/app_controller.dart';
 import '../../shared/widgets/pulse_ui.dart';
@@ -26,89 +27,140 @@ class _CreateReportPageState extends ConsumerState<CreateReportPage> {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
+    return PulsePageScroll(
       children: [
-        const PulseSectionCard(
-          title: 'Create city report',
+        PulseSectionCard(
+          title: 'Report details',
           subtitle:
-              'Fast, low-friction reporting for infrastructure, safety, and accessibility issues.',
-          child: Text(
-            'Each report can include category, urgency, description, location, and photo evidence for city teams.',
+              'Keep the description clear enough for city teams to act quickly.',
+          child: Column(
+            children: [
+              PulseDropdownField<String>(
+                label: 'Category',
+                prefixIcon: Icons.category_outlined,
+                value: _selectedCategory,
+                options: const [
+                  PulseDropdownOption(
+                    value: 'Blocked sidewalk',
+                    label: 'Blocked sidewalk',
+                    icon: Icons.block_outlined,
+                  ),
+                  PulseDropdownOption(
+                    value: 'Broken elevator',
+                    label: 'Broken elevator',
+                    icon: Icons.elevator_outlined,
+                  ),
+                  PulseDropdownOption(
+                    value: 'Missing ramp',
+                    label: 'Missing ramp',
+                    icon: Icons.accessible_forward_outlined,
+                  ),
+                  PulseDropdownOption(
+                    value: 'Fire / smoke',
+                    label: 'Fire / smoke',
+                    icon: Icons.local_fire_department_outlined,
+                  ),
+                  PulseDropdownOption(
+                    value: 'Flooding',
+                    label: 'Flooding',
+                    icon: Icons.water_drop_outlined,
+                  ),
+                  PulseDropdownOption(
+                    value: 'Broken street light',
+                    label: 'Broken street light',
+                    icon: Icons.lightbulb_outline,
+                  ),
+                ],
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() => _selectedCategory = value);
+                  }
+                },
+              ),
+              const SizedBox(height: 16),
+              PulseDropdownField<UrgencyLevel>(
+                label: 'Urgency',
+                prefixIcon: Icons.priority_high_outlined,
+                value: _urgency,
+                options: const [
+                  PulseDropdownOption(
+                    value: UrgencyLevel.low,
+                    label: 'Low',
+                    icon: Icons.keyboard_double_arrow_down_outlined,
+                  ),
+                  PulseDropdownOption(
+                    value: UrgencyLevel.medium,
+                    label: 'Medium',
+                    icon: Icons.remove_outlined,
+                  ),
+                  PulseDropdownOption(
+                    value: UrgencyLevel.high,
+                    label: 'High',
+                    icon: Icons.keyboard_double_arrow_up_outlined,
+                  ),
+                  PulseDropdownOption(
+                    value: UrgencyLevel.critical,
+                    label: 'Critical',
+                    icon: Icons.warning_amber_outlined,
+                  ),
+                ],
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() => _urgency = value);
+                  }
+                },
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _descriptionController,
+                maxLines: 5,
+                decoration: const InputDecoration(
+                  labelText: 'Description',
+                  hintText: 'Describe what happened and why it is dangerous.',
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  value: _accessibilityRelated,
+                  title: const Text('Accessibility-related issue'),
+                  subtitle: const Text(
+                    'Flag reports that directly affect wheelchair users, elderly people, low-vision users, or parents with strollers.',
+                  ),
+                  onChanged: (value) =>
+                      setState(() => _accessibilityRelated = value),
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 16),
-        DropdownButtonFormField<String>(
-          value: _selectedCategory,
-          decoration: const InputDecoration(labelText: 'Category'),
-          items: const [
-            'Blocked sidewalk',
-            'Broken elevator',
-            'Missing ramp',
-            'Fire / smoke',
-            'Flooding',
-            'Broken street light',
-          ].map((category) {
-            return DropdownMenuItem(value: category, child: Text(category));
-          }).toList(),
-          onChanged: (value) {
-            if (value != null) {
-              setState(() => _selectedCategory = value);
-            }
-          },
-        ),
-        const SizedBox(height: 16),
-        DropdownButtonFormField<UrgencyLevel>(
-          value: _urgency,
-          decoration: const InputDecoration(labelText: 'Urgency'),
-          items: UrgencyLevel.values.map((urgency) {
-            return DropdownMenuItem(
-              value: urgency,
-              child: Text(urgency.label),
-            );
-          }).toList(),
-          onChanged: (value) {
-            if (value != null) {
-              setState(() => _urgency = value);
-            }
-          },
-        ),
-        const SizedBox(height: 16),
-        TextField(
-          controller: _descriptionController,
-          maxLines: 5,
-          decoration: const InputDecoration(
-            labelText: 'Description',
-            hintText: 'Describe what happened and why it is dangerous.',
-          ),
-        ),
-        const SizedBox(height: 12),
-        SwitchListTile.adaptive(
-          contentPadding: EdgeInsets.zero,
-          value: _accessibilityRelated,
-          title: const Text('Accessibility-related issue'),
-          subtitle: const Text(
-            'Flag reports that directly affect wheelchair users, elderly people, low-vision users, or parents with strollers.',
-          ),
-          onChanged: (value) => setState(() => _accessibilityRelated = value),
-        ),
-        const SizedBox(height: 12),
         const PulseSectionCard(
           title: 'Attachments and location',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          subtitle:
+              'The UI is ready for media and geolocation, even though we are not expanding storage/database behavior in this pass.',
+          child: PulseWrapGrid(
+            minItemWidth: 170,
             children: [
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: CircleAvatar(child: Icon(Icons.photo_camera_outlined)),
-                title: Text('Camera upload'),
-                subtitle: Text('Attachment storage can be added next through Supabase Storage'),
+              PulseActionTile(
+                title: 'Camera upload',
+                subtitle:
+                    'Reserve space for image evidence and future storage integration.',
+                icon: Icons.photo_camera_outlined,
+                accentColor: AppConstants.mainAccentColor,
               ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: CircleAvatar(child: Icon(Icons.place_outlined)),
-                title: Text('Geolocation attached'),
-                subtitle: Text('Current build stores the city district and a map pin for the new report'),
+              PulseActionTile(
+                title: 'Geolocation attached',
+                subtitle:
+                    'Current build can still associate the report with the district and map pin.',
+                icon: Icons.place_outlined,
+                accentColor: AppConstants.secondaryAccentColor,
               ),
             ],
           ),
@@ -116,19 +168,21 @@ class _CreateReportPageState extends ConsumerState<CreateReportPage> {
         const SizedBox(height: 16),
         FilledButton.icon(
           onPressed: () async {
-            await ref.read(appControllerProvider).submitReport(
-              category: _selectedCategory,
-              description: _descriptionController.text.isEmpty
-                  ? 'Resident submitted a new city issue from the mobile app.'
-                  : _descriptionController.text,
-              urgency: _urgency,
-              accessibilityRelated: _accessibilityRelated,
-            );
+            await ref
+                .read(appControllerProvider)
+                .submitReport(
+                  category: _selectedCategory,
+                  description: _descriptionController.text.isEmpty
+                      ? 'Resident submitted a new city issue from the mobile app.'
+                      : _descriptionController.text,
+                  urgency: _urgency,
+                  accessibilityRelated: _accessibilityRelated,
+                );
             _descriptionController.clear();
             if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Report submitted')),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('Report submitted')));
             }
           },
           icon: const Icon(Icons.send_outlined),
@@ -147,131 +201,139 @@ class MyReportsPage extends ConsumerWidget {
     final controller = ref.watch(appControllerProvider);
     final reports = controller.myReports;
 
-    if (reports.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.all(16),
-        child: PulseEmptyState(
-          title: 'No reports yet',
-          message:
-              'Your submitted city issues will appear here with status tracking.',
-          icon: Icons.assignment_outlined,
-        ),
-      );
-    }
-
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: reports.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        final report = reports[index];
-
-        return Card(
-          child: InkWell(
-            borderRadius: BorderRadius.circular(24),
-            onTap: () => showModalBottomSheet<void>(
-              context: context,
-              isScrollControlled: true,
-              builder: (context) => ReportDetailSheet(report: report),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          report.title,
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w700,
+    return PulsePageScroll(
+      children: [
+        if (reports.isEmpty)
+          const PulseEmptyState(
+            title: 'No reports yet',
+            message:
+                'Your submitted city issues will appear here with status tracking.',
+            icon: Icons.assignment_outlined,
+          )
+        else
+          ...reports.map((report) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(28),
+                  onTap: () => showModalBottomSheet<void>(
+                    context: context,
+                    isScrollControlled: true,
+                    builder: (context) => ReportDetailSheet(report: report),
+                  ),
+                  child: PulseSectionCard(
+                    title: report.title,
+                    subtitle:
+                        '${report.category} • ${report.district} • ${report.createdAtLabel}',
+                    trailing: StatusBadge(
+                      label: report.status.label,
+                      backgroundColor: _statusColor(
+                        report.status,
+                      ).withValues(alpha: 0.12),
+                      foregroundColor: _statusColor(report.status),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(report.description),
+                        const SizedBox(height: 14),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            PulseTag(
+                              report.urgency.label,
+                              icon: Icons.priority_high_outlined,
+                              backgroundColor: AppConstants.accent2Color
+                                  .withValues(alpha: 0.10),
+                              foregroundColor: AppConstants.accent2Color,
+                            ),
+                            if (report.accessibilityRelated)
+                              PulseTag(
+                                'Accessibility issue',
+                                icon: Icons.accessible_forward_outlined,
+                                backgroundColor: AppConstants
+                                    .secondaryAccentColor
+                                    .withValues(alpha: 0.10),
+                                foregroundColor:
+                                    AppConstants.secondaryAccentColor,
                               ),
+                          ],
                         ),
-                      ),
-                      StatusBadge(
-                        label: report.status.label,
-                        backgroundColor: _statusColor(report.status).withValues(
-                          alpha: 0.16,
-                        ),
-                        foregroundColor: _statusColor(report.status),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 10),
-                  Text(report.description),
-                  const SizedBox(height: 12),
-                  Text(
-                    '${report.category} • ${report.district} • ${report.createdAtLabel}',
-                  ),
-                ],
+                ),
               ),
-            ),
-          ),
-        );
-      },
+            );
+          }),
+      ],
     );
   }
 }
 
 class ReportDetailSheet extends StatelessWidget {
-  const ReportDetailSheet({
-    super.key,
-    required this.report,
-  });
+  const ReportDetailSheet({super.key, required this.report});
 
   final CityReport report;
 
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               report.title,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 12),
             Text(report.description),
             const SizedBox(height: 20),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.flag_outlined),
-              title: const Text('Current status'),
-              subtitle: Text(report.status.label),
+            PulseInfoRow(
+              icon: Icons.flag_outlined,
+              label: 'Current status',
+              value: report.status.label,
+              accentColor: _statusColor(report.status),
             ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.priority_high_outlined),
-              title: const Text('Urgency'),
-              subtitle: Text(report.urgency.label),
+            const SizedBox(height: 14),
+            PulseInfoRow(
+              icon: Icons.priority_high_outlined,
+              label: 'Urgency',
+              value: report.urgency.label,
+              accentColor: AppConstants.accent2Color,
             ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.location_on_outlined),
-              title: const Text('Location'),
-              subtitle: Text(report.location),
+            const SizedBox(height: 14),
+            PulseInfoRow(
+              icon: Icons.location_on_outlined,
+              label: 'Location',
+              value: report.location,
+              accentColor: AppConstants.secondaryAccentColor,
             ),
-            if (report.reporterPhone.isNotEmpty)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.phone_outlined),
-                title: const Text('Reporter phone'),
-                subtitle: Text(report.reporterPhone),
+            if (report.reporterPhone.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              PulseInfoRow(
+                icon: Icons.phone_outlined,
+                label: 'Reporter phone',
+                value: report.reporterPhone,
+                accentColor: AppConstants.mainAccentColor,
               ),
-            if (report.photoLabel != null)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.image_outlined),
-                title: const Text('Attachment'),
-                subtitle: Text(report.photoLabel!),
+            ],
+            if (report.photoLabel != null) ...[
+              const SizedBox(height: 14),
+              PulseInfoRow(
+                icon: Icons.image_outlined,
+                label: 'Attachment',
+                value: report.photoLabel!,
+                accentColor: AppConstants.secondaryAccentColor,
               ),
+            ],
           ],
         ),
       ),
@@ -281,16 +343,16 @@ class ReportDetailSheet extends StatelessWidget {
 
 Color _statusColor(ReportStatus status) {
   return switch (status) {
-    ReportStatus.submitted => const Color(0xFF2563EB),
-    ReportStatus.underReview => const Color(0xFFF59E0B),
-    ReportStatus.validated => const Color(0xFF0F766E),
-    ReportStatus.assigned => const Color(0xFF7C3AED),
-    ReportStatus.inProgress => const Color(0xFFDB2777),
-    ReportStatus.resolved => const Color(0xFF059669),
-    ReportStatus.closed => const Color(0xFF334155),
-    ReportStatus.rejected => const Color(0xFFDC2626),
-    ReportStatus.duplicate => const Color(0xFF8B5CF6),
-    ReportStatus.spam => const Color(0xFFB91C1C),
-    ReportStatus.draft => const Color(0xFF64748B),
+    ReportStatus.submitted => AppConstants.secondaryAccentColor,
+    ReportStatus.underReview => AppConstants.accent2Color,
+    ReportStatus.validated => const Color(0xFF0F9D58),
+    ReportStatus.assigned => AppConstants.mainAccentColor,
+    ReportStatus.inProgress => const Color(0xFFB42318),
+    ReportStatus.resolved => const Color(0xFF15803D),
+    ReportStatus.closed => const Color(0xFF475467),
+    ReportStatus.rejected => const Color(0xFFD92D20),
+    ReportStatus.duplicate => const Color(0xFF7A5AF8),
+    ReportStatus.spam => const Color(0xFF912018),
+    ReportStatus.draft => const Color(0xFF667085),
   };
 }

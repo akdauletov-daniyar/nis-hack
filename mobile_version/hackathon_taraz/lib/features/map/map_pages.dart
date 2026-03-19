@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
+import '../../core/constants/app_constants.dart';
 import '../../core/models/app_models.dart';
 import '../../core/state/app_controller.dart';
 import '../../shared/widgets/pulse_ui.dart';
@@ -11,10 +12,7 @@ import '../../shared/widgets/pulse_ui.dart';
 const _alatauCenter = LatLng(43.2389, 76.8897);
 
 class CityMapPage extends ConsumerWidget {
-  const CityMapPage({
-    super.key,
-    required this.role,
-  });
+  const CityMapPage({super.key, required this.role});
 
   final UserRole role;
 
@@ -24,13 +22,12 @@ class CityMapPage extends ConsumerWidget {
     final route = controller.activeRoutePreview;
     final theme = Theme.of(context);
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
+    return PulsePageScroll(
       children: [
         PulseSectionCard(
-          title: 'Smart city live map',
+          title: 'City view',
           subtitle:
-              'Google Maps is now populated from database reports, incidents, and barrier alerts.',
+              'Reports, incidents, and accessibility barriers share the same map surface.',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -60,17 +57,45 @@ class CityMapPage extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
+              PulseWrapGrid(
+                minItemWidth: 140,
                 children: [
-                  const Chip(label: Text('Citizen reports')),
-                  const Chip(label: Text('Active incidents')),
-                  const Chip(label: Text('Accessibility barriers')),
+                  const PulseActionTile(
+                    title: 'Citizen reports',
+                    subtitle:
+                        'Resident-submitted infrastructure and safety issues.',
+                    icon: Icons.report_outlined,
+                    accentColor: AppConstants.secondaryAccentColor,
+                  ),
+                  const PulseActionTile(
+                    title: 'Active incidents',
+                    subtitle:
+                        'Emergency cases rendered with stronger urgency markers.',
+                    icon: Icons.emergency_outlined,
+                    accentColor: AppConstants.accent2Color,
+                  ),
+                  const PulseActionTile(
+                    title: 'Barriers',
+                    subtitle: 'Accessibility obstacles and route warnings.',
+                    icon: Icons.accessible_forward_outlined,
+                    accentColor: AppConstants.mainAccentColor,
+                  ),
                   if (role == UserRole.government)
-                    const Chip(label: Text('Government review scope')),
+                    const PulseActionTile(
+                      title: 'Review scope',
+                      subtitle:
+                          'City operations can cross-reference district issues quickly.',
+                      icon: Icons.fact_check_outlined,
+                      accentColor: AppConstants.mainAccentColor,
+                    ),
                   if (role == UserRole.emergencyService)
-                    const Chip(label: Text('Responder hotspots')),
+                    const PulseActionTile(
+                      title: 'Responder hotspots',
+                      subtitle:
+                          'Incident clusters stay visible for faster dispatching.',
+                      icon: Icons.local_fire_department_outlined,
+                      accentColor: AppConstants.accent2Color,
+                    ),
                 ],
               ),
             ],
@@ -86,17 +111,37 @@ class CityMapPage extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              DropdownButtonFormField<MobilityType>(
+              PulseDropdownField<MobilityType>(
+                label: 'Accessibility profile',
+                prefixIcon: Icons.accessible_forward_outlined,
                 value: controller.currentUser?.profile.mobilityType,
-                decoration: const InputDecoration(
-                  labelText: 'Accessibility profile',
-                ),
-                items: MobilityType.values.map((mobilityType) {
-                  return DropdownMenuItem(
-                    value: mobilityType,
-                    child: Text(mobilityType.label),
-                  );
-                }).toList(),
+                options: const [
+                  PulseDropdownOption(
+                    value: MobilityType.wheelchair,
+                    label: 'Wheelchair',
+                    icon: Icons.accessible_outlined,
+                  ),
+                  PulseDropdownOption(
+                    value: MobilityType.lowVision,
+                    label: 'Low vision',
+                    icon: Icons.visibility_outlined,
+                  ),
+                  PulseDropdownOption(
+                    value: MobilityType.elderly,
+                    label: 'Elderly',
+                    icon: Icons.elderly_outlined,
+                  ),
+                  PulseDropdownOption(
+                    value: MobilityType.stroller,
+                    label: 'Stroller',
+                    icon: Icons.child_care_outlined,
+                  ),
+                  PulseDropdownOption(
+                    value: MobilityType.general,
+                    label: 'General',
+                    icon: Icons.person_outline,
+                  ),
+                ],
                 onChanged: (mobilityType) async {
                   if (mobilityType != null) {
                     await ref
@@ -105,32 +150,37 @@ class CityMapPage extends ConsumerWidget {
                   }
                 },
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 18),
               Text(
                 route.title,
                 style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(height: 8),
-              Text('Estimated arrival: ${route.etaMinutes} min'),
+              const SizedBox(height: 6),
+              Text(
+                'Estimated arrival: ${route.etaMinutes} min',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
               const SizedBox(height: 16),
               Text(
                 'Safe highlights',
                 style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               ...route.highlights.map((line) => _LineItem(text: line)),
               const SizedBox(height: 12),
               Text(
                 'Warnings',
                 style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               ...route.warnings.map((line) => _LineItem(text: line)),
             ],
           ),
@@ -140,8 +190,8 @@ class CityMapPage extends ConsumerWidget {
           title: role == UserRole.government
               ? 'Operational map insights'
               : role == UserRole.emergencyService
-                  ? 'Incident zones'
-                  : 'Current barrier alerts',
+              ? 'Incident zones'
+              : 'Current barrier alerts',
           child: controller.obstacles.isEmpty
               ? const PulseEmptyState(
                   title: 'No active barrier alerts',
@@ -151,12 +201,54 @@ class CityMapPage extends ConsumerWidget {
                 )
               : Column(
                   children: controller.obstacles.map((obstacle) {
-                    return ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading:
-                          const CircleAvatar(child: Icon(Icons.report_problem)),
-                      title: Text(obstacle.title),
-                      subtitle: Text(obstacle.description),
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainerLow,
+                          borderRadius: BorderRadius.circular(22),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              height: 42,
+                              width: 42,
+                              decoration: BoxDecoration(
+                                color: AppConstants.accent2Color.withValues(
+                                  alpha: 0.12,
+                                ),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: const Icon(
+                                Icons.report_problem_outlined,
+                                color: AppConstants.accent2Color,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    obstacle.title,
+                                    style: theme.textTheme.titleMedium
+                                        ?.copyWith(fontWeight: FontWeight.w800),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    obstacle.description,
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     );
                   }).toList(),
                 ),
@@ -207,9 +299,7 @@ Set<Marker> _buildMarkers({
       Marker(
         markerId: MarkerId('incident-${incident.id}'),
         position: LatLng(latitude, longitude),
-        icon: BitmapDescriptor.defaultMarkerWithHue(
-          BitmapDescriptor.hueRed,
-        ),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
         infoWindow: InfoWindow(
           title: incident.title,
           snippet: '${incident.status.label} • ${incident.urgency.label}',
@@ -223,18 +313,20 @@ Set<Marker> _buildMarkers({
 
 Set<Circle> _buildCircles(List<Incident> incidents) {
   return incidents
-      .where((incident) => incident.latitude != null && incident.longitude != null)
+      .where(
+        (incident) => incident.latitude != null && incident.longitude != null,
+      )
       .map(
         (incident) => Circle(
           circleId: CircleId('incident-${incident.id}'),
           center: LatLng(incident.latitude!, incident.longitude!),
           radius: incident.urgency == UrgencyLevel.critical ? 180 : 120,
-          fillColor: (incident.urgency == UrgencyLevel.critical
-                  ? const Color(0x22EF4444)
-                  : const Color(0x22F59E0B)),
+          fillColor: incident.urgency == UrgencyLevel.critical
+              ? const Color(0x22F56029)
+              : const Color(0x223558F3),
           strokeColor: incident.urgency == UrgencyLevel.critical
-              ? const Color(0xFFDC2626)
-              : const Color(0xFFF59E0B),
+              ? AppConstants.accent2Color
+              : AppConstants.secondaryAccentColor,
           strokeWidth: 2,
         ),
       )
@@ -253,9 +345,14 @@ class _LineItem extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.only(top: 6),
-            child: Icon(Icons.circle, size: 8),
+          Container(
+            margin: const EdgeInsets.only(top: 8),
+            height: 8,
+            width: 8,
+            decoration: const BoxDecoration(
+              color: AppConstants.mainAccentColor,
+              shape: BoxShape.circle,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(child: Text(text)),

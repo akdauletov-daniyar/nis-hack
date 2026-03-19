@@ -72,114 +72,139 @@ class _AuthPageState extends ConsumerState<AuthPage> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    'Alatau Pulse',
-                    style: theme.textTheme.displaySmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Barrier-Free Alatau is now connected to Supabase. Residents sign in with email and password, while the phone number is saved for later emergency contact.',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  const PulseSectionCard(
-                    title: 'Core mobile flows',
-                    subtitle:
-                        'The app now loads accounts, roles, reports, incidents, announcements, and notifications from the database.',
-                    child: Column(
-                      children: [
-                        _FeatureBullet('Email-based sign in and registration'),
-                        SizedBox(height: 10),
-                        _FeatureBullet('Phone number stored on profile for emergency follow-up'),
-                        SizedBox(height: 10),
-                        _FeatureBullet('Role-based app shell with resident inheritance'),
-                        SizedBox(height: 10),
-                        _FeatureBullet('Live reports, incidents, alerts, and notifications'),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  SegmentedButton<bool>(
-                    segments: const [
-                      ButtonSegment<bool>(
-                        value: false,
-                        icon: Icon(Icons.login),
-                        label: Text('Sign In'),
+      backgroundColor: Colors.transparent,
+      body: PulseBackdrop(
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    PulseSectionCard(
+                      title: _isRegisterMode ? 'Create account' : 'Sign in',
+                      subtitle: _isRegisterMode
+                          ? 'Residents can register with email, phone, and district details.'
+                          : 'Use your existing email and password to continue.',
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          SegmentedButton<bool>(
+                            segments: const [
+                              ButtonSegment<bool>(
+                                value: false,
+                                icon: Icon(Icons.login),
+                                label: Text('Sign In'),
+                              ),
+                              ButtonSegment<bool>(
+                                value: true,
+                                icon: Icon(Icons.person_add_alt_1),
+                                label: Text('Register'),
+                              ),
+                            ],
+                            selected: {_isRegisterMode},
+                            onSelectionChanged: (value) {
+                              setState(() => _isRegisterMode = value.first);
+                              ref.read(appControllerProvider).dismissMessage();
+                            },
+                          ),
+                          const SizedBox(height: 20),
+                          if (controller.authError != null)
+                            _InfoBanner(
+                              color: const Color(0xFFFDE8E8),
+                              textColor: const Color(0xFFB42318),
+                              message: controller.authError!,
+                            ),
+                          if (controller.authMessage != null)
+                            _InfoBanner(
+                              color: const Color(0xFFE7F6EC),
+                              textColor: const Color(0xFF166534),
+                              message: controller.authMessage!,
+                            ),
+                          if (_isRegisterMode)
+                            _RegisterForm(
+                              isBusy: controller.isBusy,
+                              nameController: _nameController,
+                              phoneController: _phoneController,
+                              emailController: _registerEmailController,
+                              passwordController: _registerPasswordController,
+                              selectedDistrict: _selectedDistrict,
+                              onDistrictChanged: (value) {
+                                if (value != null) {
+                                  setState(() => _selectedDistrict = value);
+                                }
+                              },
+                              onSubmit: () async {
+                                await ref
+                                    .read(appControllerProvider)
+                                    .registerWithEmail(
+                                      fullName: _nameController.text,
+                                      phone: _phoneController.text,
+                                      email: _registerEmailController.text,
+                                      password:
+                                          _registerPasswordController.text,
+                                      district: _selectedDistrict,
+                                    );
+                              },
+                            )
+                          else
+                            _SignInForm(
+                              isBusy: controller.isBusy,
+                              emailController: _signInEmailController,
+                              passwordController: _signInPasswordController,
+                              onSubmit: () async {
+                                await ref
+                                    .read(appControllerProvider)
+                                    .signInWithEmail(
+                                      email: _signInEmailController.text,
+                                      password: _signInPasswordController.text,
+                                    );
+                              },
+                            ),
+                        ],
                       ),
-                      ButtonSegment<bool>(
-                        value: true,
-                        icon: Icon(Icons.person_add_alt_1),
-                        label: Text('Register'),
+                    ),
+                    const SizedBox(height: 18),
+                    PulseSectionCard(
+                      title: 'What is already connected',
+                      subtitle:
+                          'The data layer can stay as-is for now. This pass focuses on the UI and the mobile experience.',
+                      child: const PulseWrapGrid(
+                        minItemWidth: 180,
+                        children: [
+                          PulseActionTile(
+                            title: 'Role switching',
+                            subtitle:
+                                'One account can move between resident, emergency, government, and admin views.',
+                            icon: Icons.swap_horiz_rounded,
+                          ),
+                          PulseActionTile(
+                            title: 'Accessibility routing',
+                            subtitle:
+                                'Barrier-aware map and route summaries adapt to mobility profiles.',
+                            icon: Icons.route_outlined,
+                          ),
+                          PulseActionTile(
+                            title: 'Live workflows',
+                            subtitle:
+                                'Reports, incidents, alerts, and notifications already load into the interface.',
+                            icon: Icons.hub_outlined,
+                          ),
+                        ],
                       ),
-                    ],
-                    selected: {_isRegisterMode},
-                    onSelectionChanged: (value) {
-                      setState(() => _isRegisterMode = value.first);
-                      ref.read(appControllerProvider).dismissMessage();
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  if (controller.authError != null)
-                    _InfoBanner(
-                      color: const Color(0xFFFEE2E2),
-                      textColor: const Color(0xFFB91C1C),
-                      message: controller.authError!,
                     ),
-                  if (controller.authMessage != null)
-                    _InfoBanner(
-                      color: const Color(0xFFDCFCE7),
-                      textColor: const Color(0xFF166534),
-                      message: controller.authMessage!,
+                    const SizedBox(height: 18),
+                    Text(
+                      'Palette source: `app_constants.dart`',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
-                  if (_isRegisterMode)
-                    _RegisterForm(
-                      isBusy: controller.isBusy,
-                      nameController: _nameController,
-                      phoneController: _phoneController,
-                      emailController: _registerEmailController,
-                      passwordController: _registerPasswordController,
-                      selectedDistrict: _selectedDistrict,
-                      onDistrictChanged: (value) {
-                        if (value != null) {
-                          setState(() => _selectedDistrict = value);
-                        }
-                      },
-                      onSubmit: () async {
-                        await ref.read(appControllerProvider).registerWithEmail(
-                              fullName: _nameController.text,
-                              phone: _phoneController.text,
-                              email: _registerEmailController.text,
-                              password: _registerPasswordController.text,
-                              district: _selectedDistrict,
-                            );
-                      },
-                    )
-                  else
-                    _SignInForm(
-                      isBusy: controller.isBusy,
-                      emailController: _signInEmailController,
-                      passwordController: _signInPasswordController,
-                      onSubmit: () async {
-                        await ref.read(appControllerProvider).signInWithEmail(
-                              email: _signInEmailController.text,
-                              password: _signInPasswordController.text,
-                            );
-                      },
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -302,18 +327,19 @@ class _RegisterForm extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        DropdownButtonFormField<String>(
+        PulseDropdownField<String>(
+          label: 'District',
+          prefixIcon: Icons.location_city_outlined,
           value: selectedDistrict,
-          decoration: const InputDecoration(
-            labelText: 'District',
-            prefixIcon: Icon(Icons.location_city_outlined),
-          ),
-          items: AppConstants.districts.map((district) {
-            return DropdownMenuItem(
-              value: district,
-              child: Text(district),
-            );
-          }).toList(),
+          options: AppConstants.districts
+              .map(
+                (district) => PulseDropdownOption(
+                  value: district,
+                  label: district,
+                  icon: Icons.location_on_outlined,
+                ),
+              )
+              .toList(),
           onChanged: onDistrictChanged,
         ),
         const SizedBox(height: 20),
@@ -333,40 +359,42 @@ class _RegisterForm extends StatelessWidget {
 }
 
 class SetupRequiredPage extends StatelessWidget {
-  const SetupRequiredPage({
-    super.key,
-    this.message,
-  });
+  const SetupRequiredPage({super.key, this.message});
 
   final String? message;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 560),
-            child: PulseSectionCard(
-              title: 'Database setup required',
-              subtitle:
-                  'The app is connected to Supabase, but the required schema is not available yet.',
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    message ??
-                        'Run the SQL from supabase/schema.sql in your Supabase SQL Editor, then sign in again.',
+      backgroundColor: Colors.transparent,
+      body: PulseBackdrop(
+        child: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
+                child: PulseSectionCard(
+                  title: 'Database setup required',
+                  subtitle:
+                      'The app is connected to Supabase, but the required schema is not available yet.',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        message ??
+                            'Run the SQL from supabase/schema.sql in your Supabase SQL Editor, then sign in again.',
+                      ),
+                      const SizedBox(height: 18),
+                      const SelectableText(
+                        '1. Open Supabase Dashboard\n'
+                        '2. Go to SQL Editor\n'
+                        '3. Run the contents of supabase/schema.sql\n'
+                        '4. Relaunch the app',
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 16),
-                  const SelectableText(
-                    '1. Open Supabase Dashboard\n'
-                    '2. Go to SQL Editor\n'
-                    '3. Run the contents of supabase/schema.sql\n'
-                    '4. Relaunch the app',
-                  ),
-                ],
+                ),
               ),
             ),
           ),
@@ -381,38 +409,36 @@ class _SplashPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Loading Alatau Pulse...'),
-          ],
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: PulseBackdrop(
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                height: 72,
+                width: 72,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.92),
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: const Padding(
+                  padding: EdgeInsets.all(18),
+                  child: CircularProgressIndicator(strokeWidth: 3),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Loading Alatau Pulse...',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              ),
+            ],
+          ),
         ),
       ),
-    );
-  }
-}
-
-class _FeatureBullet extends StatelessWidget {
-  const _FeatureBullet(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.only(top: 6),
-          child: Icon(Icons.circle, size: 8),
-        ),
-        const SizedBox(width: 12),
-        Expanded(child: Text(text)),
-      ],
     );
   }
 }
@@ -439,10 +465,7 @@ class _InfoBanner extends StatelessWidget {
       ),
       child: Text(
         message,
-        style: TextStyle(
-          color: textColor,
-          fontWeight: FontWeight.w600,
-        ),
+        style: TextStyle(color: textColor, fontWeight: FontWeight.w700),
       ),
     );
   }

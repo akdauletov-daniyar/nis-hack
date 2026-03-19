@@ -14,65 +14,100 @@ class GovernmentFeedPage extends ConsumerWidget {
     final controller = ref.watch(appControllerProvider);
     final reports = controller.governmentFeed;
 
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: reports.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        final report = reports[index];
-
-        return PulseSectionCard(
-          title: report.title,
-          subtitle:
-              '${report.category} • ${report.district} • ${report.createdAtLabel}',
-          trailing: StatusBadge(
-            label: report.status.label,
-            backgroundColor: Colors.blue.withValues(alpha: 0.14),
-            foregroundColor: const Color(0xFF1D4ED8),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(report.description),
-              const SizedBox(height: 14),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  FilledButton.tonalIcon(
-                    onPressed: () async {
-                      await ref
-                          .read(appControllerProvider)
-                          .validateReport(report.id);
-                    },
-                    icon: const Icon(Icons.verified_outlined),
-                    label: const Text('Validate'),
-                  ),
-                  FilledButton.tonalIcon(
-                    onPressed: () async {
-                      await ref.read(appControllerProvider).assignReport(
-                            report.id,
-                            AppConstants.akimatOrganizationId,
-                          );
-                    },
-                    icon: const Icon(Icons.assignment_ind_outlined),
-                    label: const Text('Assign'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: () async {
-                      await ref
-                          .read(appControllerProvider)
-                          .rejectReport(report.id);
-                    },
-                    icon: const Icon(Icons.cancel_outlined),
-                    label: const Text('Reject'),
-                  ),
-                ],
+    return PulsePageScroll(
+      children: [
+        if (reports.isEmpty)
+          const PulseEmptyState(
+            title: 'No reports to review',
+            message:
+                'Open city issues will appear here once residents start submitting them.',
+            icon: Icons.feed_outlined,
+          )
+        else
+          ...reports.map((report) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: PulseSectionCard(
+                title: report.title,
+                subtitle:
+                    '${report.category} • ${report.district} • ${report.createdAtLabel}',
+                trailing: StatusBadge(
+                  label: report.status.label,
+                  backgroundColor: _statusColor(
+                    report.status,
+                  ).withValues(alpha: 0.12),
+                  foregroundColor: _statusColor(report.status),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(report.description),
+                    const SizedBox(height: 14),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        PulseTag(
+                          report.urgency.label,
+                          icon: Icons.priority_high_outlined,
+                          backgroundColor: AppConstants.accent2Color.withValues(
+                            alpha: 0.10,
+                          ),
+                          foregroundColor: AppConstants.accent2Color,
+                        ),
+                        if (report.accessibilityRelated)
+                          PulseTag(
+                            'Accessibility impact',
+                            icon: Icons.accessible_forward_outlined,
+                            backgroundColor: AppConstants.secondaryAccentColor
+                                .withValues(alpha: 0.10),
+                            foregroundColor: AppConstants.secondaryAccentColor,
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
+                        FilledButton.tonalIcon(
+                          onPressed: () async {
+                            await ref
+                                .read(appControllerProvider)
+                                .validateReport(report.id);
+                          },
+                          icon: const Icon(Icons.verified_outlined),
+                          label: const Text('Validate'),
+                        ),
+                        FilledButton.tonalIcon(
+                          onPressed: () async {
+                            await ref
+                                .read(appControllerProvider)
+                                .assignReport(
+                                  report.id,
+                                  AppConstants.akimatOrganizationId,
+                                );
+                          },
+                          icon: const Icon(Icons.assignment_ind_outlined),
+                          label: const Text('Assign'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            await ref
+                                .read(appControllerProvider)
+                                .rejectReport(report.id);
+                          },
+                          icon: const Icon(Icons.cancel_outlined),
+                          label: const Text('Reject'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ],
-          ),
-        );
-      },
+            );
+          }),
+      ],
     );
   }
 }
@@ -99,13 +134,11 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
   Widget build(BuildContext context) {
     final controller = ref.watch(appControllerProvider);
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
+    return PulsePageScroll(
       children: [
         PulseSectionCard(
-          title: 'Publish city announcement',
-          subtitle:
-              'Use this mobile workflow for urgent advisories and infrastructure notices.',
+          title: 'Compose announcement',
+          subtitle: 'Keep it short, urgent, and readable on small screens.',
           child: Column(
             children: [
               TextField(
@@ -115,13 +148,29 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
               const SizedBox(height: 12),
               TextField(
                 controller: _bodyController,
-                maxLines: 4,
+                maxLines: 5,
                 decoration: const InputDecoration(labelText: 'Alert body'),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
+              Row(
+                children: const [
+                  Expanded(
+                    child: PulseActionTile(
+                      title: 'Best for urgent use',
+                      subtitle:
+                          'One short title and one clear action or advisory.',
+                      icon: Icons.edit_note_outlined,
+                      accentColor: AppConstants.secondaryAccentColor,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
               FilledButton.icon(
                 onPressed: () async {
-                  await ref.read(appControllerProvider).publishAnnouncement(
+                  await ref
+                      .read(appControllerProvider)
+                      .publishAnnouncement(
                         _titleController.text.isEmpty
                             ? 'Temporary district notice'
                             : _titleController.text,
@@ -144,18 +193,52 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
           ),
         ),
         const SizedBox(height: 16),
-        ...controller.announcements.map(
-          (announcement) => Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: PulseSectionCard(
-              title: announcement.title,
-              subtitle:
-                  '${announcement.district} • ${announcement.severity} • ${announcement.createdAtLabel}',
-              child: Text(announcement.body),
-            ),
-          ),
+        PulseSectionCard(
+          title: 'Recent announcements',
+          child: controller.announcements.isEmpty
+              ? const PulseEmptyState(
+                  title: 'No city alerts yet',
+                  message:
+                      'Published announcements will show up here in reverse order.',
+                  icon: Icons.campaign_outlined,
+                )
+              : Column(
+                  children: controller.announcements.map((announcement) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: PulseSectionCard(
+                        title: announcement.title,
+                        subtitle:
+                            '${announcement.district} • ${announcement.severity} • ${announcement.createdAtLabel}',
+                        trailing: StatusBadge(
+                          label: announcement.severity,
+                          backgroundColor: AppConstants.mainAccentColor
+                              .withValues(alpha: 0.10),
+                          foregroundColor: AppConstants.mainAccentColor,
+                        ),
+                        child: Text(announcement.body),
+                      ),
+                    );
+                  }).toList(),
+                ),
         ),
       ],
     );
   }
+}
+
+Color _statusColor(ReportStatus status) {
+  return switch (status) {
+    ReportStatus.submitted => AppConstants.secondaryAccentColor,
+    ReportStatus.underReview => AppConstants.accent2Color,
+    ReportStatus.validated => const Color(0xFF0F9D58),
+    ReportStatus.assigned => AppConstants.mainAccentColor,
+    ReportStatus.inProgress => const Color(0xFFB42318),
+    ReportStatus.resolved => const Color(0xFF15803D),
+    ReportStatus.closed => const Color(0xFF475467),
+    ReportStatus.rejected => const Color(0xFFD92D20),
+    ReportStatus.duplicate => const Color(0xFF7A5AF8),
+    ReportStatus.spam => const Color(0xFF912018),
+    ReportStatus.draft => const Color(0xFF667085),
+  };
 }

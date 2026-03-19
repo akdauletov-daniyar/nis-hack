@@ -8,8 +8,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../constants/app_constants.dart';
 import '../models/app_models.dart';
 
-final appControllerProvider =
-    ChangeNotifierProvider<AppController>((ref) => AppController());
+final appControllerProvider = ChangeNotifierProvider<AppController>(
+  (ref) => AppController(),
+);
 
 class AppController extends ChangeNotifier {
   AppController() {
@@ -121,51 +122,45 @@ class AppController extends ChangeNotifier {
 
     return switch (profile) {
       MobilityType.wheelchair => const RoutePreview(
-          title: 'Barrier-free route to Clinic No. 4',
-          etaMinutes: 19,
-          highlights: [
-            'Avoids stairs and steep slopes',
-            'Uses curb-cut crossings',
-            'Reroutes around broken clinic elevator',
-          ],
-          warnings: ['Temporary detour near North Station ramp'],
-        ),
+        title: 'Barrier-free route to Clinic No. 4',
+        etaMinutes: 19,
+        highlights: [
+          'Avoids stairs and steep slopes',
+          'Uses curb-cut crossings',
+          'Reroutes around broken clinic elevator',
+        ],
+        warnings: ['Temporary detour near North Station ramp'],
+      ),
       MobilityType.lowVision => const RoutePreview(
-          title: 'High-clarity route to Akimat',
-          etaMinutes: 17,
-          highlights: [
-            'Better lit streets',
-            'Fewer unprotected crossings',
-          ],
-          warnings: ['Street light outage near East River crossing'],
-        ),
+        title: 'High-clarity route to Akimat',
+        etaMinutes: 17,
+        highlights: ['Better lit streets', 'Fewer unprotected crossings'],
+        warnings: ['Street light outage near East River crossing'],
+      ),
       MobilityType.elderly => const RoutePreview(
-          title: 'Low-stress walking route',
-          etaMinutes: 18,
-          highlights: [
-            'Minimizes stairs and long climbs',
-            'Includes rest points near pharmacies',
-          ],
-          warnings: ['Construction narrows sidewalk on School Street'],
-        ),
+        title: 'Low-stress walking route',
+        etaMinutes: 18,
+        highlights: [
+          'Minimizes stairs and long climbs',
+          'Includes rest points near pharmacies',
+        ],
+        warnings: ['Construction narrows sidewalk on School Street'],
+      ),
       MobilityType.stroller => const RoutePreview(
-          title: 'Stroller-friendly route to playground',
-          etaMinutes: 15,
-          highlights: [
-            'Smooth curb ramps',
-            'Wider pedestrian corridors',
-          ],
-          warnings: ['Temporary fence blocks direct crossing'],
-        ),
+        title: 'Stroller-friendly route to playground',
+        etaMinutes: 15,
+        highlights: ['Smooth curb ramps', 'Wider pedestrian corridors'],
+        warnings: ['Temporary fence blocks direct crossing'],
+      ),
       MobilityType.general => const RoutePreview(
-          title: 'Balanced route through Alatau Central',
-          etaMinutes: 14,
-          highlights: [
-            'Combines speed and safety',
-            'Avoids the busiest hazard cluster',
-          ],
-          warnings: ['Monitor smoke response near Bazaar Square'],
-        ),
+        title: 'Balanced route through Alatau Central',
+        etaMinutes: 14,
+        highlights: [
+          'Combines speed and safety',
+          'Avoids the busiest hazard cluster',
+        ],
+        warnings: ['Monitor smoke response near Bazaar Square'],
+      ),
     };
   }
 
@@ -283,9 +278,10 @@ class AppController extends ChangeNotifier {
 
     _setBusy(true);
     try {
-      await _client.from('profiles').update({
-        'mobility_type': mobilityType.dbValue,
-      }).eq('id', user.id);
+      await _client
+          .from('profiles')
+          .update({'mobility_type': mobilityType.dbValue})
+          .eq('id', user.id);
 
       currentUser = user.copyWith(
         profile: user.profile.copyWith(mobilityType: mobilityType),
@@ -426,7 +422,9 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> progressIncident(String incidentId) async {
-    final incident = incidents.where((item) => item.id == incidentId).firstOrNull;
+    final incident = incidents
+        .where((item) => item.id == incidentId)
+        .firstOrNull;
     if (incident == null) {
       return;
     }
@@ -445,23 +443,24 @@ class AppController extends ChangeNotifier {
     try {
       await _client
           .from('incidents')
-          .update({'status': nextStatus.dbValue}).eq('id', incidentId);
+          .update({'status': nextStatus.dbValue})
+          .eq('id', incidentId);
 
       if (incident.relatedReportId != null) {
         final reportStatus = switch (nextStatus) {
           IncidentStatus.assigned ||
           IncidentStatus.crewEnRoute ||
-          IncidentStatus.onSite =>
-            ReportStatus.inProgress,
+          IncidentStatus.onSite => ReportStatus.inProgress,
           IncidentStatus.resolved => ReportStatus.resolved,
           IncidentStatus.closed => ReportStatus.closed,
           IncidentStatus.transferred => ReportStatus.assigned,
           IncidentStatus.newIncident => ReportStatus.validated,
         };
 
-        await _client.from('reports').update({
-          'status': reportStatus.dbValue,
-        }).eq('id', incident.relatedReportId!);
+        await _client
+            .from('reports')
+            .update({'status': reportStatus.dbValue})
+            .eq('id', incident.relatedReportId!);
       }
 
       await _notifyReporterForIncident(
@@ -481,23 +480,31 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> transferIncident(String incidentId) async {
-    final incident = incidents.where((item) => item.id == incidentId).firstOrNull;
+    final incident = incidents
+        .where((item) => item.id == incidentId)
+        .firstOrNull;
     if (incident == null) {
       return;
     }
 
     _setBusy(true);
     try {
-      await _client.from('incidents').update({
-        'status': IncidentStatus.transferred.dbValue,
-        'assigned_organization_id': AppConstants.fireOrganizationId,
-      }).eq('id', incidentId);
+      await _client
+          .from('incidents')
+          .update({
+            'status': IncidentStatus.transferred.dbValue,
+            'assigned_organization_id': AppConstants.fireOrganizationId,
+          })
+          .eq('id', incidentId);
 
       if (incident.relatedReportId != null) {
-        await _client.from('reports').update({
-          'status': ReportStatus.assigned.dbValue,
-          'assigned_organization_id': AppConstants.fireOrganizationId,
-        }).eq('id', incident.relatedReportId!);
+        await _client
+            .from('reports')
+            .update({
+              'status': ReportStatus.assigned.dbValue,
+              'assigned_organization_id': AppConstants.fireOrganizationId,
+            })
+            .eq('id', incident.relatedReportId!);
       }
 
       await _notifyReporterForIncident(
@@ -564,11 +571,7 @@ class AppController extends ChangeNotifier {
         'author_user_id': user.id,
       });
 
-      await _notifyUser(
-        user.id,
-        title: 'Announcement published',
-        body: title,
-      );
+      await _notifyUser(user.id, title: 'Announcement published', body: title);
       authMessage = 'Announcement published.';
       await _loadData();
     } catch (error) {
@@ -609,7 +612,8 @@ class AppController extends ChangeNotifier {
       reportId,
       status,
       notificationTitle: 'Report moderation update',
-      notificationBody: 'A moderator updated the report status to ${status.label}.',
+      notificationBody:
+          'A moderator updated the report status to ${status.label}.',
     );
   }
 
@@ -685,8 +689,9 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> _loadCurrentUser(String userId) async {
-    final profileRows =
-        _asMapList(await _client.from('profiles').select().eq('id', userId));
+    final profileRows = _asMapList(
+      await _client.from('profiles').select().eq('id', userId),
+    );
     if (profileRows.isEmpty) {
       throw StateError(
         'Profile data is missing for this account. '
@@ -707,11 +712,12 @@ class AppController extends ChangeNotifier {
         .eq('user_id', userId)
         .order('created_at', ascending: true);
 
-    final roles = _asMapList(roleRows)
-        .map((row) => userRoleFromDb(row['role'] as String?))
-        .toSet()
-        .toList()
-      ..sort((left, right) => left.index.compareTo(right.index));
+    final roles =
+        _asMapList(roleRows)
+            .map((row) => userRoleFromDb(row['role'] as String?))
+            .toSet()
+            .toList()
+          ..sort((left, right) => left.index.compareTo(right.index));
 
     currentUser = AppUser(
       id: profile['id'].toString(),
@@ -738,8 +744,10 @@ class AppController extends ChangeNotifier {
         .from('organizations')
         .select()
         .order('name', ascending: true);
-    final reportRows =
-        await _client.from('reports').select().order('created_at', ascending: false);
+    final reportRows = await _client
+        .from('reports')
+        .select()
+        .order('created_at', ascending: false);
     final incidentRows = await _client
         .from('incidents')
         .select()
@@ -754,15 +762,17 @@ class AppController extends ChangeNotifier {
         .eq('user_id', user.id)
         .order('created_at', ascending: false);
 
-    organizations = _asMapList(organizationRows)
-        .map(Organization.fromMap)
-        .toList();
+    organizations = _asMapList(
+      organizationRows,
+    ).map(Organization.fromMap).toList();
     reports = _asMapList(reportRows).map(CityReport.fromMap).toList();
     incidents = _asMapList(incidentRows).map(Incident.fromMap).toList();
-    announcements =
-        _asMapList(announcementRows).map(Announcement.fromMap).toList();
-    notifications =
-        _asMapList(notificationRows).map(AppNotification.fromMap).toList();
+    announcements = _asMapList(
+      announcementRows,
+    ).map(Announcement.fromMap).toList();
+    notifications = _asMapList(
+      notificationRows,
+    ).map(AppNotification.fromMap).toList();
 
     if (availableRoles.contains(UserRole.admin)) {
       managedUsers = await _loadManagedUsers();
@@ -772,10 +782,14 @@ class AppController extends ChangeNotifier {
   }
 
   Future<List<AppUser>> _loadManagedUsers() async {
-    final profileRows =
-        await _client.from('profiles').select().order('created_at', ascending: false);
-    final roleRows =
-        await _client.from('role_assignments').select().eq('active', true);
+    final profileRows = await _client
+        .from('profiles')
+        .select()
+        .order('created_at', ascending: false);
+    final roleRows = await _client
+        .from('role_assignments')
+        .select()
+        .eq('active', true);
     final savedPlaceRows = await _client.from('saved_places').select();
 
     final rolesByUserId = <String, List<UserRole>>{};
@@ -797,9 +811,9 @@ class AppController extends ChangeNotifier {
 
     return _asMapList(profileRows).map((row) {
       final userId = row['id'].toString();
-      final roles = (rolesByUserId[userId] ?? const [UserRole.resident]).toSet()
-          .toList()
-        ..sort((left, right) => left.index.compareTo(right.index));
+      final roles =
+          (rolesByUserId[userId] ?? const [UserRole.resident]).toSet().toList()
+            ..sort((left, right) => left.index.compareTo(right.index));
 
       return AppUser(
         id: userId,
@@ -821,7 +835,8 @@ class AppController extends ChangeNotifier {
         'email': authUser.email,
         'full_name': authUser.userMetadata?['full_name'] as String? ?? '',
         'phone': authUser.userMetadata?['phone'] as String? ?? '',
-        'district': authUser.userMetadata?['district'] as String? ??
+        'district':
+            authUser.userMetadata?['district'] as String? ??
             AppConstants.defaultDistrict,
         'mobility_type':
             authUser.userMetadata?['mobility_type'] as String? ?? 'general',
@@ -850,10 +865,14 @@ class AppController extends ChangeNotifier {
 
     _setBusy(true);
     try {
-      await _client.from('reports').update({
-        'status': status.dbValue,
-        if (organizationId != null) 'assigned_organization_id': organizationId,
-      }).eq('id', reportId);
+      await _client
+          .from('reports')
+          .update({
+            'status': status.dbValue,
+            if (organizationId != null)
+              'assigned_organization_id': organizationId,
+          })
+          .eq('id', reportId);
 
       await _notifyUser(
         report.reporterUserId,
@@ -880,7 +899,9 @@ class AppController extends ChangeNotifier {
       return;
     }
 
-    final report = reports.where((item) => item.id == incident.relatedReportId).firstOrNull;
+    final report = reports
+        .where((item) => item.id == incident.relatedReportId)
+        .firstOrNull;
     if (report == null) {
       return;
     }
@@ -975,8 +996,10 @@ class AppController extends ChangeNotifier {
     final normalized = message.toLowerCase();
     return normalized.contains('profiles') &&
         (normalized.contains('schema cache') ||
-            normalized.contains('column') && normalized.contains('does not exist') ||
-            normalized.contains('record') && normalized.contains('has no field'));
+            normalized.contains('column') &&
+                normalized.contains('does not exist') ||
+            normalized.contains('record') &&
+                normalized.contains('has no field'));
   }
 }
 
