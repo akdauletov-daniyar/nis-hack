@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/app_models.dart';
-import '../../core/state/demo_app_controller.dart';
+import '../../core/state/app_controller.dart';
 import '../../shared/widgets/pulse_ui.dart';
 
 class EmergencyQueuePage extends ConsumerWidget {
@@ -30,9 +30,11 @@ class EmergencyQueuePage extends ConsumerWidget {
       separatorBuilder: (_, _) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final incident = queue[index];
-        final organization = controller.organizations.firstWhere(
-          (organization) => organization.id == incident.assignedOrganizationId,
-        );
+        final organization = controller.organizations
+            .where(
+              (organization) => organization.id == incident.assignedOrganizationId,
+            )
+            .firstOrNull;
 
         return PulseSectionCard(
           title: incident.title,
@@ -48,25 +50,29 @@ class EmergencyQueuePage extends ConsumerWidget {
             children: [
               Text('Reporter: ${incident.reporterName}'),
               const SizedBox(height: 6),
-              Text('Assigned org: ${organization.name}'),
+              Text(
+                'Assigned org: ${organization?.name ?? 'Unassigned emergency service'}',
+              ),
               const SizedBox(height: 16),
               Wrap(
                 spacing: 12,
                 runSpacing: 12,
                 children: [
                   FilledButton.tonalIcon(
-                    onPressed: () =>
-                        ref.read(appControllerProvider).progressIncident(
-                              incident.id,
-                            ),
+                    onPressed: () async {
+                      await ref
+                          .read(appControllerProvider)
+                          .progressIncident(incident.id);
+                    },
                     icon: const Icon(Icons.timeline_outlined),
                     label: Text(_progressLabel(incident.status)),
                   ),
                   OutlinedButton.icon(
-                    onPressed: () =>
-                        ref.read(appControllerProvider).transferIncident(
-                              incident.id,
-                            ),
+                    onPressed: () async {
+                      await ref
+                          .read(appControllerProvider)
+                          .transferIncident(incident.id);
+                    },
                     icon: const Icon(Icons.swap_horiz),
                     label: const Text('Transfer'),
                   ),
@@ -77,7 +83,9 @@ class EmergencyQueuePage extends ConsumerWidget {
                         builder: (context) => AlertDialog(
                           title: const Text('Contact reporter'),
                           content: Text(
-                            'Call ${incident.reporterName} to confirm details and accessibility needs.',
+                            incident.reporterPhone.isEmpty
+                                ? 'No phone number is stored for ${incident.reporterName} yet.'
+                                : 'Call ${incident.reporterName} at ${incident.reporterPhone} to confirm details and accessibility needs.',
                           ),
                           actions: [
                             TextButton(
@@ -146,4 +154,8 @@ String _progressLabel(IncidentStatus status) {
     IncidentStatus.transferred => 'Re-accept',
     IncidentStatus.closed => 'Closed',
   };
+}
+
+extension<T> on Iterable<T> {
+  T? get firstOrNull => isEmpty ? null : first;
 }

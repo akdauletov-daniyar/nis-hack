@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/app_models.dart';
-import '../../core/state/demo_app_controller.dart';
+import '../../core/state/app_controller.dart';
 import '../admin/admin_pages.dart';
 import '../emergency/emergency_pages.dart';
 import '../government/government_pages.dart';
@@ -71,13 +71,15 @@ class _RoleShellState extends ConsumerState<RoleShell> {
       body: activeTab.page,
       floatingActionButton: _showsSos(widget.role)
           ? FloatingActionButton.extended(
-              onPressed: () {
-                ref.read(appControllerProvider).triggerSos();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('SOS dispatched to emergency queue'),
-                  ),
-                );
+              onPressed: () async {
+                await ref.read(appControllerProvider).triggerSos();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('SOS dispatched to emergency queue'),
+                    ),
+                  );
+                }
               },
               icon: const Icon(Icons.sos),
               label: const Text('SOS'),
@@ -120,12 +122,21 @@ void _showNotifications(BuildContext context, WidgetRef ref) {
                   ),
             ),
             const SizedBox(height: 16),
+            if (controller.notifications.isEmpty)
+              const ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.notifications_off_outlined),
+                title: Text('No notifications yet'),
+                subtitle: Text('Activity updates will appear here.'),
+              ),
             ...controller.notifications.map((notification) {
               return ListTile(
                 contentPadding: EdgeInsets.zero,
-                onTap: () => ref
-                    .read(appControllerProvider)
-                    .markNotificationRead(notification.id),
+                onTap: () async {
+                  await ref
+                      .read(appControllerProvider)
+                      .markNotificationRead(notification.id);
+                },
                 leading: CircleAvatar(
                   child: Icon(
                     notification.read

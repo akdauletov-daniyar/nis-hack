@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/constants/app_constants.dart';
 import '../../core/models/app_models.dart';
-import '../../core/state/demo_app_controller.dart';
+import '../../core/state/app_controller.dart';
 import '../../shared/widgets/pulse_ui.dart';
 
 class GovernmentFeedPage extends ConsumerWidget {
@@ -39,23 +40,30 @@ class GovernmentFeedPage extends ConsumerWidget {
                 runSpacing: 12,
                 children: [
                   FilledButton.tonalIcon(
-                    onPressed: () =>
-                        ref.read(appControllerProvider).validateReport(report.id),
+                    onPressed: () async {
+                      await ref
+                          .read(appControllerProvider)
+                          .validateReport(report.id);
+                    },
                     icon: const Icon(Icons.verified_outlined),
                     label: const Text('Validate'),
                   ),
                   FilledButton.tonalIcon(
-                    onPressed: () =>
-                        ref.read(appControllerProvider).assignReport(
-                              report.id,
-                              'org-akimat',
-                            ),
+                    onPressed: () async {
+                      await ref.read(appControllerProvider).assignReport(
+                            report.id,
+                            AppConstants.akimatOrganizationId,
+                          );
+                    },
                     icon: const Icon(Icons.assignment_ind_outlined),
                     label: const Text('Assign'),
                   ),
                   OutlinedButton.icon(
-                    onPressed: () =>
-                        ref.read(appControllerProvider).rejectReport(report.id),
+                    onPressed: () async {
+                      await ref
+                          .read(appControllerProvider)
+                          .rejectReport(report.id);
+                    },
                     icon: const Icon(Icons.cancel_outlined),
                     label: const Text('Reject'),
                   ),
@@ -112,8 +120,8 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
               ),
               const SizedBox(height: 12),
               FilledButton.icon(
-                onPressed: () {
-                  ref.read(appControllerProvider).publishAnnouncement(
+                onPressed: () async {
+                  await ref.read(appControllerProvider).publishAnnouncement(
                         _titleController.text.isEmpty
                             ? 'Temporary district notice'
                             : _titleController.text,
@@ -123,9 +131,11 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
                       );
                   _titleController.clear();
                   _bodyController.clear();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Announcement published')),
-                  );
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Announcement published')),
+                    );
+                  }
                 },
                 icon: const Icon(Icons.campaign_outlined),
                 label: const Text('Publish alert'),

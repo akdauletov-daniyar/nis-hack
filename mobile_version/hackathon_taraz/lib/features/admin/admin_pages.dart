@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/app_models.dart';
-import '../../core/state/demo_app_controller.dart';
+import '../../core/state/app_controller.dart';
 import '../../shared/widgets/pulse_ui.dart';
 
 class UsersManagementPage extends ConsumerWidget {
@@ -34,8 +34,11 @@ class UsersManagementPage extends ConsumerWidget {
               ),
               const SizedBox(height: 14),
               PopupMenuButton<UserRole>(
-                onSelected: (role) =>
-                    ref.read(appControllerProvider).grantRoleToUser(user.id, role),
+                onSelected: (role) async {
+                  await ref
+                      .read(appControllerProvider)
+                      .grantRoleToUser(user.id, role);
+                },
                 itemBuilder: (context) => UserRole.values
                     .map(
                       (role) => PopupMenuItem(
@@ -48,7 +51,7 @@ class UsersManagementPage extends ConsumerWidget {
                   contentPadding: EdgeInsets.zero,
                   leading: Icon(Icons.admin_panel_settings_outlined),
                   title: Text('Grant additional role'),
-                  subtitle: Text('Demo role assignment flow'),
+                  subtitle: Text('Update real role assignments in Supabase'),
                 ),
               ),
             ],
@@ -110,21 +113,27 @@ class ModerationPage extends ConsumerWidget {
                 runSpacing: 12,
                 children: [
                   FilledButton.tonal(
-                    onPressed: () => ref
-                        .read(appControllerProvider)
-                        .moderateReport(report.id, ReportStatus.duplicate),
+                    onPressed: () async {
+                      await ref
+                          .read(appControllerProvider)
+                          .moderateReport(report.id, ReportStatus.duplicate);
+                    },
                     child: const Text('Mark duplicate'),
                   ),
                   FilledButton.tonal(
-                    onPressed: () => ref
-                        .read(appControllerProvider)
-                        .moderateReport(report.id, ReportStatus.spam),
+                    onPressed: () async {
+                      await ref
+                          .read(appControllerProvider)
+                          .moderateReport(report.id, ReportStatus.spam);
+                    },
                     child: const Text('Mark spam'),
                   ),
                   OutlinedButton(
-                    onPressed: () => ref
-                        .read(appControllerProvider)
-                        .moderateReport(report.id, ReportStatus.validated),
+                    onPressed: () async {
+                      await ref
+                          .read(appControllerProvider)
+                          .moderateReport(report.id, ReportStatus.validated);
+                    },
                     child: const Text('Approve'),
                   ),
                 ],

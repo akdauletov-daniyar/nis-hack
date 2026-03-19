@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/app_models.dart';
-import '../../core/state/demo_app_controller.dart';
+import '../../core/state/app_controller.dart';
 import '../../shared/widgets/pulse_ui.dart';
 
 class ResidentHomePage extends ConsumerWidget {

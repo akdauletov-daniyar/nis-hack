@@ -35,6 +35,7 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   flutter_riverpod: ^2.6.1
+  google_maps_flutter: 
   supabase_flutter: ^2.12.0
 
 dev_dependencies:

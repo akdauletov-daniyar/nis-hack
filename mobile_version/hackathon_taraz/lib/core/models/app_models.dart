@@ -25,9 +25,43 @@ extension UserRoleX on UserRole {
         UserRole.admin =>
           'Manage users, organizations, moderation, and categories.',
       };
+
+  String get dbValue => switch (this) {
+        UserRole.resident => 'resident',
+        UserRole.emergencyService => 'emergency_service',
+        UserRole.government => 'government',
+        UserRole.admin => 'admin',
+      };
+}
+
+UserRole userRoleFromDb(String? value) {
+  return switch (value) {
+    'resident' => UserRole.resident,
+    'emergency_service' => UserRole.emergencyService,
+    'government' => UserRole.government,
+    'admin' => UserRole.admin,
+    _ => UserRole.resident,
+  };
 }
 
 enum OrganizationType { emergency, government, admin }
+
+extension OrganizationTypeX on OrganizationType {
+  String get dbValue => switch (this) {
+        OrganizationType.emergency => 'emergency',
+        OrganizationType.government => 'government',
+        OrganizationType.admin => 'admin',
+      };
+}
+
+OrganizationType organizationTypeFromDb(String? value) {
+  return switch (value) {
+    'emergency' => OrganizationType.emergency,
+    'government' => OrganizationType.government,
+    'admin' => OrganizationType.admin,
+    _ => OrganizationType.government,
+  };
+}
 
 enum MobilityType { wheelchair, lowVision, elderly, stroller, general }
 
@@ -39,6 +73,25 @@ extension MobilityTypeX on MobilityType {
         MobilityType.stroller => 'Stroller',
         MobilityType.general => 'General',
       };
+
+  String get dbValue => switch (this) {
+        MobilityType.wheelchair => 'wheelchair',
+        MobilityType.lowVision => 'low_vision',
+        MobilityType.elderly => 'elderly',
+        MobilityType.stroller => 'stroller',
+        MobilityType.general => 'general',
+      };
+}
+
+MobilityType mobilityTypeFromDb(String? value) {
+  return switch (value) {
+    'wheelchair' => MobilityType.wheelchair,
+    'low_vision' => MobilityType.lowVision,
+    'elderly' => MobilityType.elderly,
+    'stroller' => MobilityType.stroller,
+    'general' => MobilityType.general,
+    _ => MobilityType.general,
+  };
 }
 
 enum UrgencyLevel { low, medium, high, critical }
@@ -50,6 +103,18 @@ extension UrgencyLevelX on UrgencyLevel {
         UrgencyLevel.high => 'High',
         UrgencyLevel.critical => 'Critical',
       };
+
+  String get dbValue => name;
+}
+
+UrgencyLevel urgencyLevelFromDb(String? value) {
+  return switch (value) {
+    'low' => UrgencyLevel.low,
+    'medium' => UrgencyLevel.medium,
+    'high' => UrgencyLevel.high,
+    'critical' => UrgencyLevel.critical,
+    _ => UrgencyLevel.medium,
+  };
 }
 
 enum ReportStatus {
@@ -80,6 +145,37 @@ extension ReportStatusX on ReportStatus {
         ReportStatus.duplicate => 'Duplicate',
         ReportStatus.spam => 'Spam',
       };
+
+  String get dbValue => switch (this) {
+        ReportStatus.draft => 'draft',
+        ReportStatus.submitted => 'submitted',
+        ReportStatus.underReview => 'under_review',
+        ReportStatus.validated => 'validated',
+        ReportStatus.assigned => 'assigned',
+        ReportStatus.inProgress => 'in_progress',
+        ReportStatus.resolved => 'resolved',
+        ReportStatus.closed => 'closed',
+        ReportStatus.rejected => 'rejected',
+        ReportStatus.duplicate => 'duplicate',
+        ReportStatus.spam => 'spam',
+      };
+}
+
+ReportStatus reportStatusFromDb(String? value) {
+  return switch (value) {
+    'draft' => ReportStatus.draft,
+    'submitted' => ReportStatus.submitted,
+    'under_review' => ReportStatus.underReview,
+    'validated' => ReportStatus.validated,
+    'assigned' => ReportStatus.assigned,
+    'in_progress' => ReportStatus.inProgress,
+    'resolved' => ReportStatus.resolved,
+    'closed' => ReportStatus.closed,
+    'rejected' => ReportStatus.rejected,
+    'duplicate' => ReportStatus.duplicate,
+    'spam' => ReportStatus.spam,
+    _ => ReportStatus.submitted,
+  };
 }
 
 enum IncidentStatus {
@@ -102,6 +198,29 @@ extension IncidentStatusX on IncidentStatus {
         IncidentStatus.transferred => 'Transferred',
         IncidentStatus.closed => 'Closed',
       };
+
+  String get dbValue => switch (this) {
+        IncidentStatus.newIncident => 'new',
+        IncidentStatus.assigned => 'assigned',
+        IncidentStatus.crewEnRoute => 'crew_en_route',
+        IncidentStatus.onSite => 'on_site',
+        IncidentStatus.resolved => 'resolved',
+        IncidentStatus.transferred => 'transferred',
+        IncidentStatus.closed => 'closed',
+      };
+}
+
+IncidentStatus incidentStatusFromDb(String? value) {
+  return switch (value) {
+    'new' => IncidentStatus.newIncident,
+    'assigned' => IncidentStatus.assigned,
+    'crew_en_route' => IncidentStatus.crewEnRoute,
+    'on_site' => IncidentStatus.onSite,
+    'resolved' => IncidentStatus.resolved,
+    'transferred' => IncidentStatus.transferred,
+    'closed' => IncidentStatus.closed,
+    _ => IncidentStatus.newIncident,
+  };
 }
 
 class AccessibilityProfile {
@@ -111,6 +230,15 @@ class AccessibilityProfile {
     required this.avoidSteepSlopes,
     required this.avoidBrokenElevators,
   });
+
+  factory AccessibilityProfile.fromProfileMap(Map<String, dynamic> map) {
+    return AccessibilityProfile(
+      mobilityType: mobilityTypeFromDb(map['mobility_type'] as String?),
+      avoidStairs: map['avoid_stairs'] as bool? ?? true,
+      avoidSteepSlopes: map['avoid_steep_slopes'] as bool? ?? true,
+      avoidBrokenElevators: map['avoid_broken_elevators'] as bool? ?? true,
+    );
+  }
 
   final MobilityType mobilityType;
   final bool avoidStairs;
@@ -140,6 +268,15 @@ class Organization {
     required this.type,
     required this.districts,
   });
+
+  factory Organization.fromMap(Map<String, dynamic> map) {
+    return Organization(
+      id: map['id'].toString(),
+      name: map['name'] as String? ?? 'Organization',
+      type: organizationTypeFromDb(map['type'] as String?),
+      districts: List<String>.from(map['districts'] as List? ?? const []),
+    );
+  }
 
   final String id;
   final String name;
@@ -193,33 +330,63 @@ class AppUser {
 class CityReport {
   const CityReport({
     required this.id,
+    required this.reporterUserId,
+    required this.reporterName,
+    required this.reporterPhone,
     required this.title,
     required this.category,
     required this.description,
     required this.status,
     required this.urgency,
-    required this.reporterName,
     required this.district,
     required this.location,
     required this.createdAtLabel,
     required this.accessibilityRelated,
     this.assignedOrganizationId,
     this.photoLabel,
+    this.latitude,
+    this.longitude,
   });
 
+  factory CityReport.fromMap(Map<String, dynamic> map) {
+    return CityReport(
+      id: map['id'].toString(),
+      reporterUserId: map['reporter_user_id'].toString(),
+      reporterName: map['reporter_name'] as String? ?? 'Resident',
+      reporterPhone: map['reporter_phone'] as String? ?? '',
+      title: map['title'] as String? ?? 'Untitled report',
+      category: map['category'] as String? ?? 'General',
+      description: map['description'] as String? ?? '',
+      status: reportStatusFromDb(map['status'] as String?),
+      urgency: urgencyLevelFromDb(map['urgency'] as String?),
+      district: map['district'] as String? ?? '',
+      location: map['location_text'] as String? ?? 'Unknown location',
+      createdAtLabel: formatRelativeTime(map['created_at']),
+      accessibilityRelated: map['accessibility_related'] as bool? ?? false,
+      assignedOrganizationId: map['assigned_organization_id']?.toString(),
+      photoLabel: map['photo_url'] as String?,
+      latitude: _toDouble(map['latitude']),
+      longitude: _toDouble(map['longitude']),
+    );
+  }
+
   final String id;
+  final String reporterUserId;
+  final String reporterName;
+  final String reporterPhone;
   final String title;
   final String category;
   final String description;
   final ReportStatus status;
   final UrgencyLevel urgency;
-  final String reporterName;
   final String district;
   final String location;
   final String createdAtLabel;
   final bool accessibilityRelated;
   final String? assignedOrganizationId;
   final String? photoLabel;
+  final double? latitude;
+  final double? longitude;
 
   CityReport copyWith({
     String? title,
@@ -228,21 +395,26 @@ class CityReport {
     ReportStatus? status,
     UrgencyLevel? urgency,
     String? reporterName,
+    String? reporterPhone,
     String? district,
     String? location,
     String? createdAtLabel,
     bool? accessibilityRelated,
     String? assignedOrganizationId,
     String? photoLabel,
+    double? latitude,
+    double? longitude,
   }) {
     return CityReport(
       id: id,
+      reporterUserId: reporterUserId,
+      reporterName: reporterName ?? this.reporterName,
+      reporterPhone: reporterPhone ?? this.reporterPhone,
       title: title ?? this.title,
       category: category ?? this.category,
       description: description ?? this.description,
       status: status ?? this.status,
       urgency: urgency ?? this.urgency,
-      reporterName: reporterName ?? this.reporterName,
       district: district ?? this.district,
       location: location ?? this.location,
       createdAtLabel: createdAtLabel ?? this.createdAtLabel,
@@ -251,6 +423,8 @@ class CityReport {
       assignedOrganizationId:
           assignedOrganizationId ?? this.assignedOrganizationId,
       photoLabel: photoLabel ?? this.photoLabel,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
     );
   }
 }
@@ -263,10 +437,31 @@ class Incident {
     required this.urgency,
     required this.district,
     required this.reporterName,
+    required this.reporterPhone,
     required this.assignedOrganizationId,
     required this.createdAtLabel,
     this.relatedReportId,
+    this.latitude,
+    this.longitude,
   });
+
+  factory Incident.fromMap(Map<String, dynamic> map) {
+    return Incident(
+      id: map['id'].toString(),
+      title: map['title'] as String? ?? 'Untitled incident',
+      status: incidentStatusFromDb(map['status'] as String?),
+      urgency: urgencyLevelFromDb(map['urgency'] as String?),
+      district: map['district'] as String? ?? '',
+      reporterName: map['reporter_name'] as String? ?? 'Resident',
+      reporterPhone: map['reporter_phone'] as String? ?? '',
+      assignedOrganizationId:
+          map['assigned_organization_id']?.toString() ?? '',
+      createdAtLabel: formatRelativeTime(map['created_at']),
+      relatedReportId: map['report_id']?.toString(),
+      latitude: _toDouble(map['latitude']),
+      longitude: _toDouble(map['longitude']),
+    );
+  }
 
   final String id;
   final String title;
@@ -274,9 +469,12 @@ class Incident {
   final UrgencyLevel urgency;
   final String district;
   final String reporterName;
+  final String reporterPhone;
   final String assignedOrganizationId;
   final String createdAtLabel;
   final String? relatedReportId;
+  final double? latitude;
+  final double? longitude;
 
   Incident copyWith({
     String? title,
@@ -284,9 +482,12 @@ class Incident {
     UrgencyLevel? urgency,
     String? district,
     String? reporterName,
+    String? reporterPhone,
     String? assignedOrganizationId,
     String? createdAtLabel,
     String? relatedReportId,
+    double? latitude,
+    double? longitude,
   }) {
     return Incident(
       id: id,
@@ -295,10 +496,13 @@ class Incident {
       urgency: urgency ?? this.urgency,
       district: district ?? this.district,
       reporterName: reporterName ?? this.reporterName,
+      reporterPhone: reporterPhone ?? this.reporterPhone,
       assignedOrganizationId:
           assignedOrganizationId ?? this.assignedOrganizationId,
       createdAtLabel: createdAtLabel ?? this.createdAtLabel,
       relatedReportId: relatedReportId ?? this.relatedReportId,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
     );
   }
 }
@@ -311,6 +515,16 @@ class AppNotification {
     required this.createdAtLabel,
     this.read = false,
   });
+
+  factory AppNotification.fromMap(Map<String, dynamic> map) {
+    return AppNotification(
+      id: map['id'].toString(),
+      title: map['title'] as String? ?? 'Notification',
+      body: map['body'] as String? ?? '',
+      createdAtLabel: formatRelativeTime(map['created_at']),
+      read: map['is_read'] as bool? ?? false,
+    );
+  }
 
   final String id;
   final String title;
@@ -343,6 +557,17 @@ class Announcement {
     required this.district,
     required this.createdAtLabel,
   });
+
+  factory Announcement.fromMap(Map<String, dynamic> map) {
+    return Announcement(
+      id: map['id'].toString(),
+      title: map['title'] as String? ?? 'Announcement',
+      body: map['body'] as String? ?? '',
+      severity: map['severity'] as String? ?? 'Notice',
+      district: map['district'] as String? ?? '',
+      createdAtLabel: formatRelativeTime(map['created_at']),
+    );
+  }
 
   final String id;
   final String title;
@@ -380,4 +605,37 @@ class RoutePreview {
   final int etaMinutes;
   final List<String> highlights;
   final List<String> warnings;
+}
+
+double? _toDouble(dynamic value) {
+  if (value == null) {
+    return null;
+  }
+  if (value is num) {
+    return value.toDouble();
+  }
+  return double.tryParse(value.toString());
+}
+
+String formatRelativeTime(dynamic rawTimestamp) {
+  if (rawTimestamp == null) {
+    return 'Just now';
+  }
+
+  final timestamp = DateTime.tryParse(rawTimestamp.toString());
+  if (timestamp == null) {
+    return 'Just now';
+  }
+
+  final diff = DateTime.now().difference(timestamp.toLocal());
+  if (diff.inSeconds < 60) {
+    return 'Just now';
+  }
+  if (diff.inMinutes < 60) {
+    return '${diff.inMinutes} min ago';
+  }
+  if (diff.inHours < 24) {
+    return '${diff.inHours} h ago';
+  }
+  return '${diff.inDays} d ago';
 }

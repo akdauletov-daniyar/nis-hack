@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/app_models.dart';
-import '../../core/state/demo_app_controller.dart';
+import '../../core/state/app_controller.dart';
 import '../../shared/widgets/pulse_ui.dart';
 
 class CreateReportPage extends ConsumerStatefulWidget {
@@ -26,8 +26,6 @@ class _CreateReportPageState extends ConsumerState<CreateReportPage> {
 
   @override
   Widget build(BuildContext context) {
-    final controller = ref.watch(appControllerProvider);
-
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -104,36 +102,34 @@ class _CreateReportPageState extends ConsumerState<CreateReportPage> {
                 contentPadding: EdgeInsets.zero,
                 leading: CircleAvatar(child: Icon(Icons.photo_camera_outlined)),
                 title: Text('Camera upload'),
-                subtitle: Text('Use seeded photo handling for MVP'),
+                subtitle: Text('Attachment storage can be added next through Supabase Storage'),
               ),
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: CircleAvatar(child: Icon(Icons.place_outlined)),
                 title: Text('Geolocation attached'),
-                subtitle: Text('Resident district and live GPS pin will be sent'),
+                subtitle: Text('Current build stores the city district and a map pin for the new report'),
               ),
             ],
           ),
         ),
         const SizedBox(height: 16),
         FilledButton.icon(
-          onPressed: () {
-            ref.read(appControllerProvider).submitReport(
-                  category: _selectedCategory,
-                  description: _descriptionController.text.isEmpty
-                      ? 'Resident submitted a new city issue from the mobile MVP.'
-                      : _descriptionController.text,
-                  urgency: _urgency,
-                  accessibilityRelated: _accessibilityRelated,
-                );
-            _descriptionController.clear();
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Report submitted. Total reports: ${controller.reports.length + 1}',
-                ),
-              ),
+          onPressed: () async {
+            await ref.read(appControllerProvider).submitReport(
+              category: _selectedCategory,
+              description: _descriptionController.text.isEmpty
+                  ? 'Resident submitted a new city issue from the mobile app.'
+                  : _descriptionController.text,
+              urgency: _urgency,
+              accessibilityRelated: _accessibilityRelated,
             );
+            _descriptionController.clear();
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Report submitted')),
+              );
+            }
           },
           icon: const Icon(Icons.send_outlined),
           label: const Text('Submit report'),
@@ -262,6 +258,13 @@ class ReportDetailSheet extends StatelessWidget {
               title: const Text('Location'),
               subtitle: Text(report.location),
             ),
+            if (report.reporterPhone.isNotEmpty)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.phone_outlined),
+                title: const Text('Reporter phone'),
+                subtitle: Text(report.reporterPhone),
+              ),
             if (report.photoLabel != null)
               ListTile(
                 contentPadding: EdgeInsets.zero,
