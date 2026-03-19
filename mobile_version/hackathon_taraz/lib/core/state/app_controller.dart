@@ -190,6 +190,7 @@ class AppController extends ChangeNotifier {
       authError = error.toString();
     } finally {
       _setBusy(false);
+      notifyListeners();
     }
   }
 
@@ -229,6 +230,7 @@ class AppController extends ChangeNotifier {
       authError = error.toString();
     } finally {
       _setBusy(false);
+      notifyListeners();
     }
   }
 
